@@ -1,0 +1,48 @@
+(function($){
+    $.fn.alertPop = function(options) {
+
+        return this.each(function() {
+            var msg = $(this).html();
+            if (msg != '') {
+                $(document).alertPopJs(msg, options);
+            }
+        });
+
+    };
+})(jQuery);
+
+(function($){
+    $.fn.alertPopJs = function(msg, options) {
+
+        var class_name = 'success-belt';
+        var fade_out = true;
+        if(options !== undefined) if(options.class !== undefined) var class_name = options.class;
+        if(options !== undefined) if(options.fade_out !== undefined) var fade_out = options.fade_out;
+        var settings = $.extend({
+            class_name : class_name,
+            fadeIn     : 500,
+            fadeOut    : 500,
+            z_index    : 9999
+        }, options);
+
+        return this.each(function() {
+            var popup_msg = $('<div></div>')
+                            .addClass(settings['class_name'])
+                            .css('z-index', settings['z_index'])
+                            .html(msg);
+            $('body').prepend(popup_msg);
+            $('.'+settings['class_name']).hide();
+            $('.'+settings['class_name']).fadeIn(settings.fadeIn);
+            if(fade_out === true) {
+                setTimeout(function () {
+                    $('.' + settings['class_name']).fadeOut(settings.fadeOut, function () {
+                        $(this).remove();
+                    });
+                }, 2300);
+            }else{
+                $('.' + settings['class_name']).css({ top: 0 });
+            }
+        });
+
+    };
+})(jQuery);

@@ -1,0 +1,178 @@
+.flex-center, #personality_map_detail_modal .style_title, #personality_map_detail_modal .persons_header { display: flex; align-items: center; justify-content: center; }
+
+#personality_map_detail_modal * { box-sizing: border-box; }
+
+#personality_map_detail_modal { width: 1080px; left: calc((100% - 1080px)/2); top: calc((100% - 655px)/2); height: 655px; margin: 0; overflow-y: hidden; }
+
+#personality_map_detail_modal .modal-body { max-height: none; display: flex; justify-content: center; height: calc(100% - 115px); padding: 10px 15px; }
+
+#personality_map_detail_modal .description { width: 365px; padding: 20px; position: relative; display: flex; flex-direction: column; justify-content: center; }
+
+#personality_map_detail_modal .description::before { content: ''; border: 18px solid transparent; position: absolute; margin-top: -18px; left: 100%; top: 50%; }
+
+#personality_map_detail_modal .description.CL1 { background: #ebf5ef; }
+
+#personality_map_detail_modal .description.CL1::before { border-left-color: #ebf5ef; }
+
+#personality_map_detail_modal .description.CL2 { background: #e8f1d3; }
+
+#personality_map_detail_modal .description.CL2::before { border-left-color: #e8f1d3; }
+
+#personality_map_detail_modal .description.CL3 { background: #e1efd5; }
+
+#personality_map_detail_modal .description.CL3::before { border-left-color: #e1efd5; }
+
+#personality_map_detail_modal .description.CL4 { background: #e1f1f9; }
+
+#personality_map_detail_modal .description.CL4::before { border-left-color: #e1f1f9; }
+
+#personality_map_detail_modal .description.CL5 { background: #eee9f2; }
+
+#personality_map_detail_modal .description.CL5::before { border-left-color: #eee9f2; }
+
+#personality_map_detail_modal .description.CL6 { background: #fdfdf4; }
+
+#personality_map_detail_modal .description.CL6::before { border-left-color: #fdfdf4; }
+
+#personality_map_detail_modal .description.CL7 { background: #fcf3ea; }
+
+#personality_map_detail_modal .description.CL7::before { border-left-color: #fcf3ea; }
+
+#personality_map_detail_modal .description.CL8 { background: #f6d7e6; }
+
+#personality_map_detail_modal .description.CL8::before { border-left-color: #f6d7e6; }
+
+#personality_map_detail_modal .description.CL1 .icon { background-image: url("../../../assets/img/cef1g/ef1g_fox_c.png"); }
+
+#personality_map_detail_modal .description.CL2 .icon { background-image: url("../../../assets/img/cef1g/ef1g_raccoondog_c.png"); }
+
+#personality_map_detail_modal .description.CL3 .icon { background-image: url("../../../assets/img/cef1g/ef1g_sheep_c.png"); }
+
+#personality_map_detail_modal .description.CL4 .icon { background-image: url("../../../assets/img/cef1g/ef1g_tiger_c.png"); }
+
+#personality_map_detail_modal .description.CL5 .icon { background-image: url("../../../assets/img/cef1g/ef1g_mole_c.png"); }
+
+#personality_map_detail_modal .description.CL6 .icon { background-image: url("../../../assets/img/cef1g/ef1g_lion_c.png"); }
+
+#personality_map_detail_modal .description.CL7 .icon { background-image: url("../../../assets/img/cef1g/ef1g_hourse_c.png"); }
+
+#personality_map_detail_modal .description.CL8 .icon { background-image: url("../../../assets/img/cef1g/ef1g_monkey_c.png"); }
+
+#personality_map_detail_modal .type_overview { display: flex; margin-bottom: 5px; }
+
+#personality_map_detail_modal .type_overview .icon { width: 60px; height: 60px; background-size: contain; background-repeat: no-repeat; }
+
+#personality_map_detail_modal .type_overview .text { flex: 1; margin-left: 15px; }
+
+#personality_map_detail_modal .type_overview .text .name { font-size: 18px; font-weight: bold; margin-bottom: 5px; }
+
+#personality_map_detail_modal .type_description { background: #fff; padding: 10px; }
+
+#personality_map_detail_modal .type_elements .main_elements { display: flex; margin: 5px 0 0px; flex-direction: row; flex-wrap: wrap; }
+
+#personality_map_detail_modal .type_elements .element { background: #fff; border: solid 2px #1D9CA2; padding: 3px; margin: 0 5px 5px 0; font-feature-settings: "palt"; }
+
+#personality_map_detail_modal .type_elements p { margin: 0; font-size: 12px; }
+
+#personality_map_detail_modal .multiplied { margin: 10px auto; height: 25px; width: 30px; padding: 0; position: relative; }
+
+#personality_map_detail_modal .multiplied .diagonal { height: 100%; width: 100%; border-top: solid 1px; position: absolute; top: -15px; left: 0; }
+
+#personality_map_detail_modal .multiplied .right-up { transform: matrix(1, -1, 0, 1, 0, 30); }
+
+#personality_map_detail_modal .multiplied .right-down { transform: matrix(1, 1, 0, 1, 0, 30); }
+
+#personality_map_detail_modal .style.style-A .style_title { background: #D93939; }
+
+#personality_map_detail_modal .style.style-A .type_elements div.element { border: solid 2px #D93939; }
+
+#personality_map_detail_modal .style.style-B .style_title { background: #D15A9A; }
+
+#personality_map_detail_modal .style.style-B .type_elements div.element { border: solid 2px #D15A9A; }
+
+#personality_map_detail_modal .style.style-C .style_title { background: #3F7FC7; }
+
+#personality_map_detail_modal .style.style-C .type_elements div.element { border: solid 2px #3F7FC7; }
+
+#personality_map_detail_modal .style.style-D .style_title { background: #EA7F03; }
+
+#personality_map_detail_modal .style.style-D .type_elements div.element { border: solid 2px #EA7F03; }
+
+#personality_map_detail_modal .style.style-E .style_title { background: #59B27D; }
+
+#personality_map_detail_modal .style.style-E .type_elements div.element { border: solid 2px #59B27D; }
+
+#personality_map_detail_modal .style_title { color: #fff; padding: 5px 0; font-size: 15px; }
+
+#personality_map_detail_modal .style_content { background: #fff; padding: 10px; }
+
+#personality_map_detail_modal .style_content .bold { font-weight: bold; }
+
+#personality_map_detail_modal .persons { width: 590px; margin-left: 40px; border: solid 3px #D9D9D9; border-radius: 10px; display: flex; flex-direction: column; }
+
+#personality_map_detail_modal .persons_header { font-size: 15px; font-weight: bold; border-bottom: solid 2px #D9D9D9; padding: 8px 0; }
+
+#personality_map_detail_modal .persons_content { display: flex; flex-direction: initial; flex: 1; position: relative; height: 100%; }
+
+#personality_map_detail_modal .list_outline { flex: 1; display: flex; flex-direction: column; height: 100%; }
+
+#personality_map_detail_modal .list_outline .total { border-bottom: solid 2px #D9D9D9; }
+
+#personality_map_detail_modal .list_outline:nth-child(2) { border-left: solid 2px #D9D9D9; }
+
+#personality_map_detail_modal .list_outline .total { padding: 10px 0; }
+
+#personality_map_detail_modal .list_outline .total .result { margin-top: 10px; font-size: 20px; display: flex; align-items: baseline; justify-content: center; }
+
+#personality_map_detail_modal .list_outline .total .numbers { font-size: 30px; font-weight: bold; }
+
+#personality_map_detail_modal .list_outline .list { padding: 10px 15px; overflow-y: auto; overflow-x: hidden; flex: 1; }
+
+#personality_map_detail_modal .list_outline .list .filter-wrapper { display: flex; margin-bottom: 10px; flex-wrap: wrap; }
+
+#personality_map_detail_modal .list_outline .list .filter-wrapper .phase_and_year-filter { display: flex; align-items: center; }
+
+#personality_map_detail_modal .list_outline .list .filter-wrapper .phase_and_year-filter .filter { margin-bottom: 0; }
+
+#personality_map_detail_modal .list_outline .list .filter-wrapper .phase_and_year-filter .filter[name="phase"] { width: 115px; margin: 0 10px 0 5px; }
+
+#personality_map_detail_modal .list_outline .list .filter-wrapper .phase_and_year-filter .filter[name="year"] { width: 90px; margin-left: 5px; }
+
+#personality_map_detail_modal .list_outline .list .filter-wrapper .label-filter { display: flex; align-items: center; }
+
+#personality_map_detail_modal .list_outline .list .filter-wrapper .label-filter #selected_detaillabel { margin-left: 10px; display: block; width: 210px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 12px; color: #999; }
+
+#personality_map_detail_modal .list_outline.student { flex-basis: 65%; }
+
+#personality_map_detail_modal .list_outline.student .item { display: flex; margin-bottom: 10px; }
+
+#personality_map_detail_modal .list_outline.student .item .photo { width: 40px; height: 40px; border: 2px solid #ccc; border-radius: 4px; padding: 1px; }
+
+#personality_map_detail_modal .list_outline.student .item .prof { padding-left: 10px; overflow: hidden; flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; width: 280px; }
+
+#personality_map_detail_modal .list_outline.student .item .prof .name { display: block; width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+
+#personality_map_detail_modal .list_outline.student .item .prof .college { font-size: 12px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+
+#personality_map_detail_modal .list_outline.student .item.not-link { pointer-events: none; }
+
+#personality_map_detail_modal .list_outline.student .item.not-link .name { color: #333; }
+
+#personality_map_detail_modal .list_outline.employee { flex-basis: 35%; }
+
+#personality_map_detail_modal .list_outline.employee .list { padding-top: 86px; }
+
+#personality_map_detail_modal .list_outline.employee .list .name_text { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; max-width: 110px; min-width: 32px; }
+
+#personality_map_detail_modal .list_outline.employee .item { height: 45px; }
+
+#personality_map_detail_modal .list_outline.employee .name { display: flex; }
+
+#personality_map_detail_modal .list_outline.employee .date { font-size: 12px; }
+
+#label_filter_modal .modal { height: 450px; }
+
+@media screen and (max-height: 600px) { #modal_cactivepersonal, #cactivestudent_modal { top: 10px !important; height: 500px !important; overflow-x: hidden !important; overflow-y: scroll !important; }
+  #personality_map_detail_modal, #modal_cactivepersonal, #cactivestudent_modal { top: 10px !important; height: 500px !important; overflow-x: hidden !important; overflow-y: scroll !important; margin-top: 0px !important; }
+  #personality_map_detail_modal .description { justify-content: flex-start !important; }
+  #personality_map_detail_modal .flex-center.pattern, #personality_map_detail_modal .pattern.style_title, #personality_map_detail_modal .pattern.persons_header { display: block !important; } }

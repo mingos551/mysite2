@@ -1,0 +1,55 @@
+// 学生非表示リクエスト送信
+// tooltip at studenthide
+$(function() {
+	$( ".hidestudent" ).tooltip();
+});
+
+$(document).on('click', '.studentToHide', function(event) {
+	var student_id = $(this).data('student-id');
+	var userid = $(this).parents('.profile-box').find('.userid span').text();
+	var undoDom;
+	var self = this;
+	var callback = function(res) {
+		if ($('.lyt-panel').size()) {
+			undoDom = '<div class="mb20 studentHideBox__box"><div class="widget-content widget widget-content-studentHideBox"><button class="ofb-btn ofb-btn--small pull-right studentToShow"><i class="fa fa-reply"></i> 元に戻す</button><p><span>学生番号:<span class="userid">' + userid + '</span>を非表示にしました。</span></p></div></div>'
+		} else {
+			undoDom = '<div class="mb20 studentHideBox__box"><div class="widget-content widget widget-content-studentHideBox"><button class="ofb-btn ofb-btn--small pull-right studentToShow"><i class="fa fa-reply"></i> 元に戻す</button><p>学生番号:<span class="userid">' + userid + '</span><br> を非表示にしました。<br> <span class="ofbicon-unsubscribe"></span></p></div></div>'
+		}
+		$(self).parents('.profile-box').css('display', 'none').after(undoDom);
+	};
+	
+	studentToggle($(this), student_id, true, callback);
+});
+
+$(document).on('click', '.studentToShow', function(event) {
+	var student_id = $(this).data('student-id');
+	var self = this;
+	var callback = function(res) {
+		$(self).parents('.studentHideBox__box').prev('.profile-box').show();
+		$(self).parents('.studentHideBox__box').remove();
+	};
+	
+	studentToggle($(this), student_id, false, callback);
+});
+
+function studentToggle(clickBtnObj, student_id, hide, callback) {
+	clickBtnObj.prop('disabled', true);
+
+	$.ajax({
+		url      : '/ccompanymemo/hidestudent',
+		type     : 'POST',
+		dataType : 'json',
+		cache    : false,
+		data     : {
+			sid  : student_id,
+			hide : hide
+		}
+	})
+	.done(callback)
+	.fail(function() {
+		alert("リクエストに失敗しました。");
+	})
+	.always(function() {
+		clickBtnObj.prop('disabled', false);
+	});
+}

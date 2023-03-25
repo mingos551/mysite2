@@ -1,0 +1,97 @@
+//  検討中リスト操作Ajax
+//  呼び出しはofferboxTutorial.jsから
+$(function () {
+    $.fn.favorite_save = function() {
+
+        return this.each(function() {
+
+            var s_id = $(this).data('student_id');
+            var status = $(this).data('status');
+            var post_data = {
+                STUDENT_ID : s_id,
+                STATUS     : status
+            };
+            if ($(this).data('pattern')) {
+                post_data['PATTERN'] = $(this).data('pattern');
+            }
+
+            var is_multi_button = false;
+            // 1学生に対して、検討中のボタンが複数画面に存在する場合
+            if($(this).hasClass('considers')){
+                 is_multi_button = true;
+            }
+
+            // 連打されて多重登録されないようにする
+            var button_element = $(this).css('pointer-events', 'none');
+
+            $.ajax({
+                type     : 'POST',
+                cache    : false,
+                dataType : 'json',
+                url      : '/api/company/favorite/toggle',
+                data     : post_data
+            }).done(function(res) {
+                button_element.css('pointer-events', 'auto');
+                if (res.status == true) {
+                    if (is_multi_button) {
+                        var favorite_btn = $('.consider-' + s_id);
+                        var favcntObj = $('.favcnt-' + s_id);
+                        var favcnt = parseInt(favcntObj.html());
+                    } else {
+                        var favorite_btn = $('#consider-' + s_id);
+                        var favcntObj = $('#favcnt-' + s_id);
+                        var favcnt = parseInt(favcntObj.html());
+                    }
+
+                    var foot_btn = $('.consider-footer-' + s_id);
+
+                    favorite_btn.data('status', res.favstatus);
+                    if (foot_btn[0]) {
+                        foot_btn.data('status', res.favstatus);
+                    }
+
+                    var icon_tag = '';
+                    var view_txet = '';
+
+                    if (res.favmode) {
+                        favorite_btn.addClass('ofb-btn--listin');
+                        if (foot_btn[0]) {
+                            foot_btn.addClass('ofb-btn--listin');
+                        }
+
+                        icon_tag = '<i class="fa fa-star"></i>';
+                        view_txet = ' 検討中';
+                        favcnt++;
+                    } else {
+                        favorite_btn.removeClass('ofb-btn--listin');
+                        if (foot_btn[0]) {
+                            foot_btn.removeClass('ofb-btn--listin');
+                        }
+                        icon_tag = '<i class="fa fa-plus"></i>';
+                        view_txet = ' 検討する';
+                        if (favcnt > 0) {
+                            favcnt--;
+                        }
+                    }
+
+                    favorite_btn.html('').append(icon_tag, view_txet);
+                    if (foot_btn[0]) {
+                        foot_btn.html('').append(icon_tag, view_txet);
+                    }
+
+                    favcntObj.html(favcnt);
+                } else {
+                    if (res.error_message) {
+                        alert(res.error_message);
+                    } else {
+                        alert('検討中リストへの保存に失敗しました。');
+                    }
+                }
+            }).fail(function() {
+                alert('検討中リストへの保存に失敗しました。');
+            });
+        });
+
+    }
+
+})

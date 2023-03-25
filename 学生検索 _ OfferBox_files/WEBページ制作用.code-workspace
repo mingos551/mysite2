@@ -1,0 +1,13 @@
+{
+	"folders": [
+		{
+			"path": "../../WEBページ制作用"
+		},
+		{
+			"path": "../2023.01 【HTML,CSS,JS,PHP,Git,Docker】プログラミング初心者でもＯＫ/udemy-web-app-documents-1.3.0/02_html-css/samples/quiz-app"
+		}
+	],
+	"settings": {
+		"liveServer.settings.multiRootWorkspaceName": "WEBページ制作用"
+	}
+}

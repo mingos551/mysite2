@@ -1,0 +1,87 @@
+/** 新募集要項の新機能通知ダイアログ */
+
+'use strict';
+
+$(function() {
+    /** @var {object} 新募集要項の新機能通知ダイアログ */
+    const RECRUITMENT_NOTICE_DIALOG = $('#recruitment_notice_dialog');
+    /** @var {object} ダイアログを閉じるアクションを実行する要素 */
+    const DISMISS_OBJECT = $('[data-dismiss="#recruitment_notice_dialog"]');
+    /** @var {object} 募集要項画面へ移動するリンクボタン */
+    const LINK_BUTTON = $('button.link');
+
+    /** @var {number} 二重クリックの防止時間(ms) */
+    const PREVENT_CLICK_TIME = 1000;
+    /** @var {number} 通信のタイムアウト時間(ms) */
+    const FORCED_TERMINATION_TIME = 60000;
+
+    /** 画面が読み込まれた時に実行する処理 */
+    $.ajax({
+        type: 'GET',
+        url: '/api/company/recruitment/notice',
+        cache: false,
+        timeout: FORCED_TERMINATION_TIME,
+        dataType: 'json',
+    })
+    .done(function(data) {
+        // 通知対象であれば、ダイアログの非表示を解除
+        if (data.is_notice) {
+            RECRUITMENT_NOTICE_DIALOG.removeClass('hide');
+        // 非対象であれば、ダイアログそのものを削除
+        } else {
+            RECRUITMENT_NOTICE_DIALOG.remove();
+        }
+    })
+    .fail(function(data) {
+        if (data.responseText && JSON.parse(data.responseText).message) {
+            message = JSON.parse(data.responseText).message;
+            alert(message);
+        }
+        RECRUITMENT_NOTICE_DIALOG.remove();
+    });
+
+    // ダイアログを閉じるアクションを実行する要素がクリックされた時の処理
+    DISMISS_OBJECT.on('click', function() {
+        preventClick($(this));
+        RECRUITMENT_NOTICE_DIALOG.remove();
+        postConfirmedDialog();
+    });
+
+    // 募集要項画面へ移動するリンクボタンがクリックされた時の処理
+    LINK_BUTTON.on('click', function() {
+        preventClick($(this));
+        postConfirmedDialog();
+    });
+
+    /**
+     * ダイアログに意思表示したことをpostする
+     */
+    function postConfirmedDialog() {
+        $.ajax({
+            type: 'POST',
+            url: '/api/company/recruitment/notice',
+            cache: false,
+            timeout: FORCED_TERMINATION_TIME,
+            dataType: 'json',
+        })
+        .done(function(data) {})
+        .fail(function(data) {
+            if (data.responseText && JSON.parse(data.responseText).message) {
+                message = JSON.parse(data.responseText).message;
+                alert(message);
+            }
+            RECRUITMENT_NOTICE_DIALOG.remove();
+        });
+    }
+
+    /**
+     * クリック防止
+     * @param {object} target
+     */
+    function preventClick(target) {
+        target.css('pointer-events', 'none');
+        setTimeout(function() {
+            target.css('pointer-events', 'auto');
+        }, PREVENT_CLICK_TIME);
+    }
+});

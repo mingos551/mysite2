@@ -1,0 +1,33 @@
+// イベントアカウント用学生一括検討中登録
+$(function(){
+    $(document).on('click', '.eventfavoritebundle', function(e){
+        var i = 0;
+        var data = {};
+        $('.ofb-btn--favorite').each(function(){
+            // 検討中済みか確認
+            if (!$(this).hasClass('ofb-btn--listin') && !$(this).attr('disabled')) {
+                var student_id = $(this).attr('data-STUDENT_ID');
+
+                data[student_id] = {'status' : 1};
+
+                i++;
+            }
+        });
+
+        if (!window.confirm(i + '件を検討中に入れます。よろしいですか？')) {
+            return false;
+        }
+
+        $.ajax({
+            url      : '/cfavorite/favoritebundle',
+            type     : "POST",
+            dataType : 'json',
+            data     : data,
+            cache    : false,
+        })
+        .done(function(ret){
+            window.alert(ret);
+        });
+
+    });
+});

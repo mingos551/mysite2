@@ -1,0 +1,2645 @@
+$(document).ready(function () {
+    // 検索条件リストの取得用
+    var limit  = 5;
+    var offset = 0;
+    var offset_stop = false;
+    var shared_csearchlist_limit  = 5;
+    var shared_csearchlist_offset = 0;
+    var shared_csearchlist_offset_stop = false;
+    var set_history = false;
+
+    window.sessionStorage.setItem('searchlist_end', false);
+    window.sessionStorage.setItem('shared_searchlist_end', false);
+
+    // pre_search_countをするかどうか
+    window.sessionStorage.setItem('pre_search_count_flg', true);
+
+    // ページ読み込み完了時に実行
+    $(document).ready(function () {
+
+        // ツールチップ設定
+        $("#form_ACTIVEYEAR").tooltip();
+        $('[data-toggle="tooltip"]').tooltip();
+
+        // UI関係の挙動
+        ui_settings();
+        ui_student_categories_settings();
+
+        init_more2_duplicate_form();
+
+        // マルチセレクト化
+        set_multi_select();
+
+        // 大学名セレクト表示
+        set_college_list();
+
+        // 専攻の挙動設定
+        set_bunri_checkbox();
+
+        // 現住所エリアセレクト表示
+        set_prefecture_checkbox();
+
+        // 志望勤務地セレクト表示
+        set_wishrgn_checkbox();
+
+        // 出身地セレクト表示（スタンダード
+        set_birthplace_checkbox();
+        // 出身地セレクト表示（アスリート
+        set_birthplace_athlete_checkbox();
+
+        // PG経験セレクト表示
+        set_pg_checkbox();
+
+        // オファー承認数セレクト表示
+        setOfferCountList();
+
+        // 組織診断セレクト表示
+        set_orgdiag_checkbox();
+
+        // 事業フェーズ
+        set_growthtypes_checkbox();
+
+        // ビジネスパフォーマンス偏差値セレクト表示
+        set_business_deviation_list();
+
+        // コンピテンシー偏差値セレクト表示
+        set_competency_list();
+
+        // 検索履歴
+        set_history_list();
+
+        // ワンクリック検索
+        one_click_search();
+
+        set_search_list_control();
+
+        update_share_search_list();
+
+        // 検索数リアルタイム更新
+        $('#search-form').change(function() {
+            var pre_search_count_flg = window.sessionStorage.getItem('pre_search_count_flg');
+            if (pre_search_count_flg == 'true') {
+                set_search_count(make_search_params());
+            }
+        });
+
+        // トップページは非同期検索
+        if ($('#searchHit')[0] || $('#default-result-header .alert.alert-info')[0]) {
+            // 検索条件リスト
+            set_search_list(limit, offset, 0);
+            set_search_list(shared_csearchlist_limit, shared_csearchlist_offset, 1);
+
+            // 検索結果ある場合はスクロール
+            var p = $('#default-result-header').offset().top;
+            $('html,body').animate({scrollTop: p}, 400, 'swing');
+        } else if (!$('#searchcreative-form')[0]) {
+            // 非同期検索
+            search_by_ajax(limit, offset);
+        }
+
+        $('#reference_terms').scroll(function() {
+            var searchlist_end = window.sessionStorage.getItem('searchlist_end');
+            if (searchlist_end == 'true') {
+                return;
+            }
+
+            var scroll_here   = $(this).outerHeight() + $(this).scrollTop();
+            var scroll_bottom = $(this)[0].scrollHeight;
+
+            // ブラウザの縮小表示対策で、要素のボトム-20pxで再読込実行
+            if (scroll_here >= scroll_bottom - 20) {
+                if (!offset_stop && offset < 15) {
+                    offset_stop = true;
+                    offset += limit;
+                    set_search_list(limit, offset, 0);
+                }
+            }
+        });
+
+        $('#reference_shared_terms').scroll(function() {
+            var searchlist_end = window.sessionStorage.getItem('shared_searchlist_end');
+            if (searchlist_end == 'true') {
+                return;
+            }
+
+            var scroll_here   = $(this).outerHeight() + $(this).scrollTop();
+            var scroll_bottom = $(this)[0].scrollHeight;
+
+            // ブラウザの縮小表示対策で、要素のボトム-20pxで再読込実行
+            if (scroll_here >= scroll_bottom - 20) {
+                if (!shared_csearchlist_offset_stop && shared_csearchlist_offset < 395) {
+                    shared_csearchlist_offset_stop = true;
+                    shared_csearchlist_offset += shared_csearchlist_limit;
+                    set_search_list(shared_csearchlist_limit, shared_csearchlist_offset, 1);
+                }
+            }
+        });
+
+        // フォームリセット
+        $('.form_reset').click(function() {
+            set_pre_search_count_disable();
+
+            $.ajax({
+                url      : '/cstudent/form_clear',
+                type     : 'POST',
+                dataType : 'json'
+            });
+
+            reset_search_form();
+            if (typeof resetPremiumSearch == 'function') {
+                resetPremiumSearch();
+            }
+
+            set_pre_search_count_enable();
+            set_search_count(make_search_params());
+
+            // 条件設定までスクロールアップ
+            var scroll_top_element;
+            if ($('.tabbable')[0]) {
+                scroll_top_element = $('.tabbable');
+            } else {
+                // 代理店画面には'.tabbable'要素が存在しないため、'.nav-tabs'要素にスクロールする。
+                scroll_top_element = $('.nav-tabs');
+            }
+            var p = scroll_top_element.offset().top;
+            $('html,body').animate({scrollTop: p}, 400, 'swing');
+
+            return false;
+        });
+
+        // footer submit
+        $('.search_form_submit').click(function() {
+            $('#search-form').append('<input type="hidden" name="student_search" value="1" />');
+            $('#search-form').submit();
+        });
+
+    });
+
+    /**
+     * UI関係の挙動
+     */
+    function ui_settings() {
+        // search-detail accordion
+        $(".js-c-searchlist--more-c").hide();
+        $(".js-c-searchlist--more").click(function() {
+            $(this).next(".js-c-searchlist--more-c").slideToggle();
+            // 現在のアイコン状態で＋にするか−にするか判定
+            if($(this).find('i').is('.icon-chevron-down')){
+                // ＋アイコンに変更
+                $(this).find('i').removeClass().addClass('icon icon-chevron-up pull-right');
+            }else{
+                // −アイコンに変更
+                $(this).find('i').removeClass().addClass('icon icon-chevron-down pull-right');
+            }
+        });
+
+        // 適性検索未契約ウィンドウの削除ボタン
+        try {
+            if (Cookies.get('premium-close')) {
+                $('.js-close').closest('.c-premium').remove();
+            }
+        } catch(e) {}
+        $('.js-close').click(function() {
+            $(this).closest('.c-premium').remove();
+            Cookies.set('premium-close', 'hide', { expires: 30 });
+        });
+
+        // // premium search accordion
+        // $(".c-searchlist--contents-premium").hide();
+        // $(".c-searchlist--title-premium").click(function() {
+        //     $(this).next().slideToggle().siblings(".data").slideUp();
+        //     // 現在のアイコン状態で＋にするか−にするか判定
+        //     if($(this).children('i').is('.fa-chevron-down')){
+        //         // ＋アイコンに変更
+        //         $(this).children('i').removeClass().addClass('fa fa-chevron-up  pull-left txt16 pr10');
+        //     }else{
+        //         // −アイコンに変更
+        //         $(this).children('i').removeClass().addClass('fa fa-chevron-down pull-left txt16 pr10');
+        //     }
+        // });
+        // $(".c-searchlist--title-premium").click(function(){
+        //     $(this).toggleClass("open");
+        // });
+
+        // 追跡フッターの表示タイミング
+        var topBtn = $('#c-fixed__btn-area2');
+        topBtn.hide();
+        $(window).scroll(function () {
+            if ($(this).scrollTop() > 200) {
+                topBtn.fadeIn();
+            } else {
+                topBtn.fadeOut();
+            }
+        });
+        $('.fa-times').click(function(){
+            $('#c-fixed__btn-area').css('display', 'none');
+        });
+
+        // 会いたい通知がきた学生にオファーをおくりませんか？学部の高さ調整
+        $(".want-student").heightLine();
+
+        // ワンクリック検索高さ調整
+        $(".c-oneclicksearch .c-oneclicksearch__cat a p").heightLine();
+    }
+
+    /**
+     * プラグインを使用したマルチセレクト化
+     */
+    function set_multi_select() {
+        // 志望業界のマルチセレクト化
+        function setMultiSelectTextOfList(selectElem, textElem){
+            var thisText = $(selectElem).siblings('.ms-parent').find('.ms-choice').text();
+            $(textElem).text(thisText);
+        }
+        $('#form_WISH_IND option[value="0"]').remove();
+        var wishIndMultiOption = {
+            selectAll            : false,
+            allSelected          : 'すべて',
+            countSelected        : false,
+            width                : '100%',
+            placeholder          : '志望業界',
+            minimumCountSelected : 5
+        };
+        if($('#itemValueWishInd').size() > 0){
+            wishIndMultiOption.onClick = function(){
+                setMultiSelectTextOfList('#form_WISH_IND', '#itemValueWishInd');
+            };
+        }
+        $.when(
+            $('#form_WISH_IND').multipleSelect(wishIndMultiOption)
+        ).done(function(){
+            setMultiSelectTextOfList('#form_WISH_IND', '#itemValueWishInd');
+        });
+
+        // 志望職種のマルチセレクト化
+        $('#form_WISH_OCP option[value="0"]').remove();
+        var wishOcpMultiOption = {
+            selectAll            : false,
+            allSelected          : 'すべて',
+            countSelected        : false,
+            width                : '100%',
+            placeholder          : '志望職種',
+            minimumCountSelected : 5
+        };
+        if($('#itemValueWishOcp').size() > 0){
+            wishOcpMultiOption.onClick = function(){
+                setMultiSelectTextOfList('#form_WISH_OCP', '#itemValueWishOcp');
+            };
+        }
+        $.when(
+            $('#form_WISH_OCP').multipleSelect(wishOcpMultiOption)
+        ).done(function(){
+            setMultiSelectTextOfList('#form_WISH_OCP', '#itemValueWishOcp');
+        });
+
+        // 企業選びの軸のマルチセレクト化
+        $('#form_WISH_CC option[value="0"]').remove();
+        var wishCcMultiOption = {
+            selectAll            : false,
+            allSelected          : 'すべて',
+            countSelected        : false,
+            width                : '100%',
+            placeholder          : '企業選びの軸',
+            minimumCountSelected : 5
+        };
+        if($('#itemValueWishCc').size() > 0){
+            wishCcMultiOption.onClick = function(){
+                setMultiSelectTextOfList('#form_WISH_CC', '#itemValueWishCc');
+            };
+        }
+        $.when(
+            $('#form_WISH_CC').multipleSelect(wishCcMultiOption)
+        ).done(function(){
+            setMultiSelectTextOfList('#form_WISH_CC', '#itemValueWishCc');
+        });
+    }
+
+    /**
+     * 大学名セレクト挙動設定
+     */
+    function set_college_list() {
+        $('#form_cinitial').change(function() {
+            var no = $(this).val();
+            var options = $('.college_name_list_'+no).html();
+            $('#form_COLLEGE').html(options);
+            $('#form_COLLEGE').val(0);
+        });
+    }
+
+    /**
+     * 専攻の挙動設定
+     */
+    function set_bunri_checkbox() {
+        set_check_action($('#form_BUNKEI'), $('.bunkei_checkbox'), $('#bunkei_show_label'));
+        set_check_action($('#form_RIKEI'), $('.rikei_checkbox'), $('#rikei_show_label'));
+
+        function set_check_action(all_checkbox, group_checkbox, label_ares) {
+            // init
+            group_checked_check();
+
+            all_checkbox.click(function() {
+                var label_id = $(this).attr('id') + '_all_checked_label';
+                if ($(this).prop('checked')) {
+                    var label = $('<label />').attr('id', label_id).text($(this).next().text());
+                    label_ares.html(label);
+                } else {
+                    $('#'+label_id).remove();
+                }
+                group_checkbox.prop('checked', $(this).prop('checked'));
+            });
+
+            group_checkbox.click(function() {
+                var no = $(this).data('bunri-no');
+                if ($(this).prop('checked')) {
+                    var label = $('<label />').attr('id', 'checked_label_'+no).text($('.bunri_label_'+no).text());
+                    label_ares.append(label);
+                } else {
+                    $('#checked_label_'+no).remove();
+                }
+
+                group_checked_check();
+            });
+
+            function group_checked_check() {
+                var checked_label_list = [];
+                var all_checked_flag   = true;
+                $.each(group_checkbox, function() {
+                    if ($(this).prop('checked')) {
+                        var no = $(this).data('bunri-no');
+                        var label = $('<label />').attr('id', 'checked_label_'+no).text($('.bunri_label_'+no).text());
+                        checked_label_list.push(label);
+                    } else {
+                        all_checked_flag = false;
+                    }
+                });
+
+                all_checkbox.prop('checked', all_checked_flag);
+                if (all_checked_flag) {
+                    var label = $('<label />').attr('id', 'bunkei_all').text(all_checkbox.next().text());
+                    label_ares.html(label);
+                } else {
+                    label_ares.html('');
+                    $.each(checked_label_list, function() {
+                        label_ares.append($(this));
+                    });
+                }
+            }
+        }
+
+        // その他
+        $('.other_checkbox').click(function() {
+            if ($(this).prop('checked')) {
+                var label = $('<label />').attr('id', 'other_checked_label').text('その他');
+                $('#other_show_label').html(label);
+            } else {
+                $('#other_checked_label').remove();
+            }
+        });
+
+        // etc init
+        if ($('.other_checkbox').prop('checked')) {
+            var label = $('<label />').attr('id', 'other_checked_label').text('その他');
+            $('#other_show_label').html(label);
+        }
+
+    }
+
+    /**
+     * 志望勤務地の挙動設定
+     */
+    function set_wishrgn_checkbox() {
+        // 志望勤務地：エリアクリック時に該当する都道府県のCheck ON/OFFを行う
+        $('.wishRgnAll').click(function() {
+            var area_no   = $(this).data('rgn-area-no');
+            var prop_flag = $(this).prop('checked');
+            var id        = 'wish_all_' + area_no;
+            var text      = $(this).next('label').text().replace('▼', '');
+            if (prop_flag) {
+                var label = $('<label />').attr('id', id).data('area-no', area_no).text(text);
+                $('#wishrgn_selected').append(label);
+                $('#wishrgn_selected').find('.area_no_'+area_no).remove();
+            } else {
+                $('#wishrgn_selected').children('#' + id).remove();
+            }
+            $('.wishrgn_checkbox').filter('[data-rgn-area-no=' + area_no + ']').prop('checked', prop_flag);
+        });
+
+        $('.wishrgn_checkbox').click(function() {
+            var label_ares = $('#wishrgn_selected');
+
+            // 単体ラベル操作
+            var area_no  = $(this).data('rgn-area-no');
+            var label_id = $(this).attr('id') + '_checked_label';
+            if ($(this).prop('checked')) {
+                var text  = $(this).next('label').text();
+                var label = $('<label />').attr('id', label_id).addClass('area_no_'+area_no).text(text);
+                label_ares.append(label);
+            } else {
+                label_ares.find('#' + label_id).remove();
+            }
+
+            // エリアグループチェック
+            var checkbox_group        = $('.wishrgn_checkbox[data-rgn-area-no=' + area_no + ']');
+            var group_label_list      = [];
+            $.each(checkbox_group, function() {
+                if ($(this).prop('checked')) {
+                    var label_id = $(this).attr('id') + '_checked_label';
+                    if ($('#'+label_id).length == 0) {
+                        var text  = $(this).next('label').text();
+                        var label = $('<label />').attr('id', label_id).addClass('area_no_'+area_no).text(text);
+                        group_label_list.push(label);
+                    }
+                }
+            });
+
+            // エリアグループのラベル操作
+            var group_all_checked_flg = getGroupAllCheckedFlg(checkbox_group);
+            $('[name=WHISH_RGN_ALL_'+area_no+']').prop('checked', group_all_checked_flg);
+            if (group_all_checked_flg) {
+                var rgn_text  = $('[name=WHISH_RGN_ALL_'+area_no+']').next('label').text().replace('▼', '');
+                var rgn_label = $('<label />').attr('id', 'wish_all_' + area_no).data('area-no', area_no).text(rgn_text);
+                label_ares.append(rgn_label);
+                label_ares.find('.area_no_'+area_no).remove();
+            } else {
+                label_ares.find('label#wish_all_'+area_no).remove();
+                $.each(group_label_list, function(index, label) {
+                    label_ares.append(label);
+                });
+            }
+
+        });
+
+        function changeWishRgnAnywhere() {
+            if ($('#form_WISH_RGN_ANYWHERE').prop('checked')) {
+                var text = $('#form_WISH_RGN_ANYWHERE').next().text();
+                $('#wishrgn_selected').append($('<label />').attr('id', 'WISH_RGN_ANYWHERE').text(text));
+            } else {
+                $('#WISH_RGN_ANYWHERE').remove();
+            }
+        }
+        function getGroupAllCheckedFlg(checkbox_group) {
+            var group_all_checked_flg = true;
+            $.each(checkbox_group, function() {
+                if (!$(this).prop('checked')) {
+                    group_all_checked_flg = false;
+                }
+            });
+            return group_all_checked_flg;
+        }
+        $('#form_WISH_RGN_ANYWHERE').click(function() {
+            changeWishRgnAnywhere();
+        });
+
+        // init
+        $.each($('.wishRgnAll'), function() {
+            var area_no = $(this).data('rgn-area-no');
+            var checkbox_group        = $('.wishrgn_checkbox[data-rgn-area-no=' + area_no + ']');
+            // エリアのチェック状態をエリア内の都道府県のチェック状態より判定する（Get時エリアのチェック状態を保持できない）
+            var group_all_checked_flg = getGroupAllCheckedFlg(checkbox_group);
+            $('[name=WHISH_RGN_ALL_'+area_no+']').prop('checked', group_all_checked_flg);
+            if (group_all_checked_flg) {
+                var id    = 'wish_all_' + area_no;
+                var text  = $(this).next('label').text().replace('▼', '');
+                var label = $('<label />').attr('id', id).data('area-no', area_no).text(text);
+                $('#wishrgn_selected').append(label);
+                $('.wishrgn_checkbox').filter('[data-rgn-area-no=' + area_no + ']').prop('checked', true);
+            } else {
+                $.each($('.wishrgn_checkbox').filter('[data-rgn-area-no=' + area_no + ']'), function() {
+                    if ($(this).prop('checked')) {
+                        var id    = $(this).attr('id') + '_checked_label';
+                        var text  = $(this).next('label').text();
+                        var label = $('<label />').attr('id', id).addClass('area_no_'+area_no).text(text);
+                        $('#wishrgn_selected').append(label);
+                    }
+                });
+            }
+        });
+
+        changeWishRgnAnywhere();
+    }
+
+    /**
+     * 現住所の挙動設定
+     */
+    function set_prefecture_checkbox() {
+        // 現住所：エリアクリック時に該当する都道府県のCheck ON/OFFを行う
+        $('.prefectureAll').click(function() {
+            var area_no   = $(this).data('prefecture-area-no');
+            var prop_flag = $(this).prop('checked');
+            var id        = 'prefecture_all_' + area_no;
+            var text      = $(this).next('label').text().replace('▼', '');
+            if (prop_flag) {
+                var label = $('<label />').attr('id', id).data('prefecture-area-no', area_no).text(text);
+                $('#prefecture_selected').append(label);
+                $('#prefecture_selected').find('.area_no_'+area_no).remove();
+            } else {
+                $('#prefecture_selected').children('#' + id).remove();
+            }
+            $('.prefecture_checkbox').filter('[data-prefecture-area-no=' + area_no + ']').prop('checked', prop_flag);
+        });
+
+        $('.prefecture_checkbox').click(function() {
+            var label_ares = $('#prefecture_selected');
+
+            // 単体ラベル操作
+            var area_no  = $(this).data('prefecture-area-no');
+            var label_id = $(this).attr('id') + '_checked_label';
+            if ($(this).prop('checked')) {
+                var text  = $(this).next('label').text();
+                var label = $('<label />').attr('id', label_id).addClass('area_no_'+area_no).text(text);
+                label_ares.append(label);
+            } else {
+                label_ares.find('#' + label_id).remove();
+            }
+
+            // エリアグループチェック
+            var checkbox_group        = $('.prefecture_checkbox[data-prefecture-area-no=' + area_no + ']');
+            var group_label_list      = [];
+            $.each(checkbox_group, function() {
+                if ($(this).prop('checked')) {
+                    var label_id = $(this).attr('id') + '_checked_label';
+                    if ($('#'+label_id).length == 0) {
+                        var text  = $(this).next('label').text();
+                        var label = $('<label />').attr('id', label_id).addClass('area_no_'+area_no).text(text);
+                        group_label_list.push(label);
+                    }
+                }
+            });
+
+            // エリアグループのラベル操作
+            var group_all_checked_flg = getGroupAllCheckedFlg(checkbox_group);
+            $('[name=PREFECTURE_ALL_'+area_no+']').prop('checked', group_all_checked_flg);
+            if (group_all_checked_flg) {
+                var area_text  = $('[name=PREFECTURE_ALL_'+area_no+']').next('label').text().replace('▼', '');
+                var area_label = $('<label />').attr('id', 'prefecture_all_' + area_no).data('area-no', area_no).text(area_text);
+                label_ares.append(area_label);
+                label_ares.find('.area_no_'+area_no).remove();
+            } else {
+                label_ares.find('label#prefecture_all_'+area_no).remove();
+                $.each(group_label_list, function(index, label) {
+                    label_ares.append(label);
+                });
+            }
+
+        });
+
+        function getGroupAllCheckedFlg(checkbox_group) {
+            var group_all_checked_flg = true;
+            $.each(checkbox_group, function() {
+                if (!$(this).prop('checked')) {
+                    group_all_checked_flg = false;
+                }
+            });
+            return group_all_checked_flg;
+        }
+
+        // init
+        $.each($('.prefectureAll'), function() {
+            var area_no = $(this).data('prefecture-area-no');
+            var checkbox_group        = $('.prefecture_checkbox[data-prefecture-area-no=' + area_no + ']');
+            // エリアのチェック状態をエリア内の都道府県のチェック状態より判定する（Get時エリアのチェック状態を保持できない）
+            var group_all_checked_flg = getGroupAllCheckedFlg(checkbox_group);
+            $('[name=PREFECTURE_ALL_'+area_no+']').prop('checked', group_all_checked_flg);
+            if (group_all_checked_flg) {
+                var id    = 'prefecture_all_' + area_no;
+                var text  = $(this).next('label').text().replace('▼', '');
+                var label = $('<label />').attr('id', id).data('area-no', area_no).text(text);
+                $('#prefecture_selected').append(label);
+                $('.prefecture_checkbox').filter('[data-prefecture-area-no=' + area_no + ']').prop('checked', true);
+            } else {
+                $.each($('.prefecture_checkbox').filter('[data-prefecture-area-no=' + area_no + ']'), function() {
+                    if ($(this).prop('checked')) {
+                        var id    = $(this).attr('id') + '_checked_label';
+                        var text  = $(this).next('label').text();
+                        var label = $('<label />').attr('id', id).addClass('area_no_'+area_no).text(text);
+                        $('#prefecture_selected').append(label);
+                    }
+                });
+            }
+        });
+    }
+
+    /**
+     * 出身地の挙動設定(スタンダード）
+     */
+    function set_birthplace_checkbox() {
+        // 出身地：エリアクリック時に該当する都道府県のCheck ON/OFFを行う
+        $('.birthplaceAll').click(function() {
+            var area_no   = $(this).data('birthplace-area-no');
+            var prop_flag = $(this).prop('checked');
+            var id        = 'birthplace_all_' + area_no;
+            var text      = $(this).next('label').text().replace('▼', '');
+            if (prop_flag) {
+                var label = $('<label />').attr('id', id).data('birthplace-area-no', area_no).text(text);
+                $('#birthplace_selected').append(label);
+                $('#birthplace_selected').find('.area_no_'+area_no).remove();
+            } else {
+                $('#birthplace_selected').children('#' + id).remove();
+            }
+            $('.birthplace_checkbox').filter('[data-birthplace-area-no=' + area_no + ']').prop('checked', prop_flag);
+        });
+
+        $('.birthplace_checkbox').click(function() {
+            var label_ares = $('#birthplace_selected');
+
+            // 単体ラベル操作
+            var area_no  = $(this).data('birthplace-area-no');
+            var label_id = $(this).attr('id') + '_checked_label';
+            if ($(this).prop('checked')) {
+                var text  = $(this).next('label').text();
+                var label = $('<label />').attr('id', label_id).addClass('area_no_'+area_no).text(text);
+                label_ares.append(label);
+            } else {
+                label_ares.find('#' + label_id).remove();
+            }
+
+            // エリアグループチェック
+            var checkbox_group        = $('.birthplace_checkbox[data-birthplace-area-no=' + area_no + ']');
+            var group_label_list      = [];
+            $.each(checkbox_group, function() {
+                if ($(this).prop('checked')) {
+                    var label_id = $(this).attr('id') + '_checked_label';
+                    if ($('#'+label_id).length == 0) {
+                        var text  = $(this).next('label').text();
+                        var label = $('<label />').attr('id', label_id).addClass('area_no_'+area_no).text(text);
+                        group_label_list.push(label);
+                    }
+                }
+            });
+
+            // エリアグループのラベル操作
+            var group_all_checked_flg = getGroupAllCheckedFlg(checkbox_group);
+            $('[name=BIRTHPLACE_ALL_'+area_no+']').prop('checked', group_all_checked_flg);
+            if (group_all_checked_flg) {
+                var area_text  = $('[name=BIRTHPLACE_ALL_'+area_no+']').next('label').text().replace('▼', '');
+                var area_label = $('<label />').attr('id', 'birthplace_all_' + area_no).data('area-no', area_no).text(area_text);
+                label_ares.append(area_label);
+                label_ares.find('.area_no_'+area_no).remove();
+            } else {
+                label_ares.find('label#birthplace_all_'+area_no).remove();
+                $.each(group_label_list, function(index, label) {
+                    label_ares.append(label);
+                });
+            }
+
+        });
+
+        function changeBirthplaceAnywhere() {
+            if ($('#form_BIRTHPLACE_ANYWHERE').prop('checked')) {
+                var text = $('#form_BIRTHPLACE_ANYWHERE').next().text();
+                $('#birthplace_selected').append($('<label />').attr('id', 'BIRTHPLACE_ANYWHERE').text(text));
+            } else {
+                $('#BIRTHPLACE_ANYWHERE').remove();
+            }
+        }
+        function getGroupAllCheckedFlg(checkbox_group) {
+            var group_all_checked_flg = true;
+            $.each(checkbox_group, function() {
+                if (!$(this).prop('checked')) {
+                    group_all_checked_flg = false;
+                }
+            });
+            return group_all_checked_flg;
+        }
+
+        $('#form_BIRTHPLACE_ANYWHERE').click(function() {
+            changeBirthplaceAnywhere();
+        });
+
+        // init
+        $.each($('.birthplaceAll'), function() {
+            var area_no = $(this).data('birthplace-area-no');
+            var checkbox_group        = $('.birthplace_checkbox[data-birthplace-area-no=' + area_no + ']');
+            // エリアのチェック状態をエリア内の都道府県のチェック状態より判定する（Get時エリアのチェック状態を保持できない）
+            var group_all_checked_flg = getGroupAllCheckedFlg(checkbox_group);
+            $('[name=BIRTHPLACE_ALL_'+area_no+']').prop('checked', group_all_checked_flg);
+            if (group_all_checked_flg) {
+                var id    = 'birthplace_all_' + area_no;
+                var text  = $(this).next('label').text().replace('▼', '');
+                var label = $('<label />').attr('id', id).data('area-no', area_no).text(text);
+                $('#birthplace_selected').append(label);
+                $('.birthplace_checkbox').filter('[data-birthplace-area-no=' + area_no + ']').prop('checked', true);
+            } else {
+                $.each($('.birthplace_checkbox').filter('[data-birthplace-area-no=' + area_no + ']'), function() {
+                    if ($(this).prop('checked')) {
+                        var id    = $(this).attr('id') + '_checked_label';
+                        var text  = $(this).next('label').text();
+                        var label = $('<label />').attr('id', id).addClass('area_no_'+area_no).text(text);
+                        $('#birthplace_selected').append(label);
+                    }
+                });
+            }
+        });
+
+        changeBirthplaceAnywhere();
+    }
+    /**
+     * 出身地の挙動設定(アスリート）
+     */
+    function set_birthplace_athlete_checkbox() {
+        // 出身地：エリアクリック時に該当する都道府県のCheck ON/OFFを行う
+        $('.birthplaceAthleteAll').click(function() {
+            var area_no   = $(this).data('birthplace-athlete-area-no');
+            var prop_flag = $(this).prop('checked');
+            var id        = 'birthplace_athelete_all_' + area_no;
+            var text      = $(this).next('label').text().replace('▼', '');
+            if (prop_flag) {
+                var label = $('<label />').attr('id', id).data('area-no', area_no).text(text);
+                $('#birthplace_athlete_selected').append(label);
+                $('#birthplace_athlete_selected').find('.area_no_'+area_no).remove();
+            } else {
+                $('#birthplace_athlete_selected').children('#' + id).remove();
+            }
+            $('.birthplace_athlete_checkbox').filter('[data-birthplace-athlete-area-no=' + area_no + ']').prop('checked', prop_flag);
+        });
+
+        $('.birthplace_athlete_checkbox').click(function() {
+            var label_ares = $('#birthplace_athlete_selected');
+
+            // 単体ラベル操作
+            var area_no  = $(this).data('birthplace-athlete-area-no');
+            var label_id = $(this).attr('id') + '_checked_label';
+            if ($(this).prop('checked')) {
+                var text  = $(this).next('label').text();
+                var label = $('<label />').attr('id', label_id).addClass('area_no_'+area_no).text(text);
+                label_ares.append(label);
+            } else {
+                label_ares.find('#' + label_id).remove();
+            }
+
+            // エリアグループチェック
+            var checkbox_group        = $('.birthplace_athlete_checkbox[data-birthplace-athlete-area-no=' + area_no + ']');
+            var group_label_list      = [];
+            $.each(checkbox_group, function() {
+                if ($(this).prop('checked')) {
+                    var label_id = $(this).attr('id') + '_checked_label';
+                    if ($('#'+label_id).length == 0) {
+                        var text  = $(this).next('label').text();
+                        var label = $('<label />').attr('id', label_id).addClass('area_no_'+area_no).text(text);
+                        group_label_list.push(label);
+                    }
+                }
+            });
+
+            // エリアグループのラベル操作
+            var group_all_checked_flg = getGroupAllCheckedFlg(checkbox_group);
+            $('[name=BIRTHPLACE_ATHLETE_ALL_'+area_no+']').prop('checked', group_all_checked_flg);
+            if (group_all_checked_flg) {
+                var area_text  = $('[name=BIRTHPLACE_ATHLETE_ALL_'+area_no+']').next('label').text().replace('▼', '');
+                var area_label = $('<label />').attr('id', 'birthplace_athlete_all_' + area_no).data('area-no', area_no).text(area_text);
+                label_ares.append(area_label);
+                label_ares.find('.area_no_'+area_no).remove();
+            } else {
+                label_ares.find('label#birthplace_athlete_all_'+area_no).remove();
+                $.each(group_label_list, function(index, label) {
+                    label_ares.append(label);
+                });
+            }
+
+        });
+
+        function changeBirthplaceAthleteAnywhere() {
+            if ($('#form_BIRTHPLACE_ATHLETE_ANYWHERE').prop('checked')) {
+                var text = $('#form_BIRTHPLACE_ATHLETE_ANYWHERE').next().text();
+                $('#birthplace_athelete_selected').append($('<label />').attr('id', 'BIRTHPLACE_ATHLETE_ALL_').text(text));
+            } else {
+                $('#BIRTHPLACE_ATHLETE_ANYWHERE').remove();
+            }
+        }
+        function getGroupAllCheckedFlg(checkbox_group) {
+            var group_all_checked_flg = true;
+            $.each(checkbox_group, function() {
+                if (!$(this).prop('checked')) {
+                    group_all_checked_flg = false;
+                }
+            });
+            return group_all_checked_flg;
+        }
+        $('#form_BIRTHPLACE_ATHLETE_ANYWHERE').click(function() {
+            changeBirthplaceAthleteAnywhere();
+        });
+
+        // init
+        $.each($('.birthplaceAthleteAll'), function() {
+            var area_no = $(this).data('birthplace-athlete-area-no');
+            var checkbox_group        = $('.birthplace_athlete_checkbox[data-birthplace-athlete-area-no=' + area_no + ']');
+            // エリアのチェック状態をエリア内の都道府県のチェック状態より判定する（Get時エリアのチェック状態を保持できない）
+            var group_all_checked_flg = getGroupAllCheckedFlg(checkbox_group);
+            $('[name=BIRTHPLACE_ATHLETE_ALL_'+area_no+']').prop('checked', group_all_checked_flg);
+            if (group_all_checked_flg) {
+                var id    = 'birthplace_athlete_all_' + area_no;
+                var text  = $(this).next('label').text().replace('▼', '');
+                var label = $('<label />').attr('id', id).data('area-no', area_no).text(text);
+                $('#birthplace_athlete_selected').append(label);
+                $('.birthplace_athlete_checkbox').filter('[data-birthplace-athlete-area-no=' + area_no + ']').prop('checked', true);
+            } else {
+                $.each($('.birthplace_athlete_checkbox').filter('[data-birthplace-athlete-area-no=' + area_no + ']'), function() {
+                    if ($(this).prop('checked')) {
+                        var id    = $(this).attr('id') + '_checked_label';
+                        var text  = $(this).next('label').text();
+                        var label = $('<label />').attr('id', id).addClass('area_no_'+area_no).text(text);
+                        $('#birthplace_athlete_selected').append(label);
+                    }
+                });
+            }
+        });
+
+        changeBirthplaceAthleteAnywhere();
+    }
+    /**
+     * プログラム挙動設定
+     */
+    function set_pg_checkbox() {
+        // init
+        all_checkbox_check();
+
+        $('[id^="form_PGALL"]').click(function() {
+            $(this).closest('.modal-body').find('.pg-checkbox').prop('checked', $(this).prop('checked'));
+            all_checkbox_check();
+        });
+
+        $('.pg-checkbox').click(function() {
+            all_checkbox_check();
+        });
+
+        function all_checkbox_check() {
+            $.each($('.js-searchlist--more2__cbox'), function() {
+                if ($(this).prop('checked') == true) {
+                    var attr  = $(this).val();
+                    var more2 = $('.searchcontent--'+attr);
+                    var show_area = more2.find('.pg-lang__label');
+
+                    var all_checked_flag   = true;
+                    var checked_label_list = [];
+                    $.each(more2.find('.pg-checkbox'), function() {
+                        var label_id = $(this).attr('id') + '_checked_label';
+                        if ($(this).prop('checked')) {
+                            if ($('#' + label_id).length == 0) {
+                                var text  = $(this).next('label').text();
+                                var label = $('<label />').attr('id', label_id).text(text);
+                                checked_label_list.push(label);
+                            }
+                        } else {
+                            $('#' + label_id).remove();
+                            all_checked_flag = false;
+                        }
+                    });
+
+                    more2.find('[id^="form_PGALL"]').prop('checked', all_checked_flag);
+                    if (all_checked_flag) {
+                        var label = $('<label />').attr('id', 'pg_all_checked').text('全て選択');
+                        show_area.html(label);
+                    } else {
+                        show_area.find('#pg_all_checked').remove();
+                        $.each(checked_label_list, function() {
+                            show_area.append($(this));
+                        });
+                    }
+                }
+            });
+        }
+
+    }
+
+    /**
+     * オファー承認数セレクト挙動設定
+     */
+    function setOfferCountList() {
+        var form_lower = '#form_OFFER_LOWER';
+        var form_upper = '#form_OFFER_UPPER';
+
+        $(form_lower).change(function() {
+            var lower_val = Number($(this).val());
+            var upper_val = Number($(form_upper).val());
+
+            if (lower_val == 0 && $(form_upper).val() == '') {
+                $(form_upper).val(0);
+            } else if (lower_val > upper_val) {
+                $(form_upper).val(lower_val);
+            }
+        });
+
+        $(form_upper).change(function() {
+            var lower_val = Number($(form_lower).val());
+            var upper_val = Number($(this).val());
+
+            if ($(this).val() == '') {
+                $(form_lower).val('');
+            } else if (lower_val > upper_val) {
+                $(form_lower).val(upper_val);
+            }
+        });
+    }
+
+    /**
+     * 組織診断セレクト表示
+     */
+    function set_orgdiag_checkbox() {
+        // init
+        $.each($('[id^=form_orgdiag_]'), function() {
+            if ($(this).prop('checked')) {
+                if ($(this).val() > 0) {
+                    changeSelectBtnColor($(this), 'on');
+
+                    var text = $(this).parent().next().find('.info_title').text();
+                    if ($('#premium_search').html() == '') {
+                        $('#premium_search').html('組織診断結果：<span id="premium_selected"></span>に一致');
+                    }
+                    if (text) {
+                        $('#premium_selected').html(text);
+                    }
+
+                    // コンピテンシーの検索条件を初期化
+                    $.each($('[name^=GROWTHTYPE_LARGE]'), function() {
+                        $(this).removeAttr('checked');
+                    });
+                    $('[name^=BUSINESS_DEVIATION]').val(0);
+                    $('[name^=DIAGHIGHTPERFORMCHOICE]').val(2).prop('checked', true);
+                    $('[name^=DIAGHIGHTPERFORM_]').val(0);
+                } else {
+                    $('#premium_search').html('');
+                    changeSelectBtnColor($(this), 'off');
+                }
+
+                // 検索する組織の属性を取得
+                var radio_id = $(this).attr('id');
+                if (radio_id.indexOf('personal') >= 0) {
+                    $('#ORGDIAG_ATTR').val('personal');
+                } else if (radio_id.indexOf('label') >= 0) {
+                    $('#ORGDIAG_ATTR').val('label');
+                } else if (radio_id.indexOf('dept') >= 0) {
+                    $('#ORGDIAG_ATTR').val('dept');
+                } else {
+                    $('#ORGDIAG_ATTR').val('org');
+                }
+            }
+        });
+
+        // add click event
+        $('[id^=form_orgdiag_]').click(function() {
+            if ($(this).prop('checked')) {
+                // 一旦チェックボックスを全てクリア
+                changeSelectBtnColor($(this), 'off');
+
+                // 改めて該当のチェックボックスにchecked
+                changeSelectBtnColor($(this), 'on');
+
+                var text = $(this).parent().next().find('.info_title').text();
+                if ($('#premium_search').html() == '' || $('#premium_search').html().match(/個別コンピテンシー(.*)/)) {
+                    $('#premium_search').html('組織診断結果：<span id="premium_selected"></span>に一致');
+                }
+                if (text) {
+                    $('#premium_selected').html('<label id=orgdiag_checked_label_'+$(this).val()+'>'+text+'</label>');
+                }
+
+                // コンピテンシーの検索条件を初期化
+                $.each($('[name^=GROWTHTYPE_LARGE]'), function() {
+                    $(this).removeAttr('checked');
+                });
+                $('[name^=BUSINESS_DEVIATION]').val(0);
+                $('[name^=DIAGHIGHTPERFORMCHOICE]').val(2).prop('checked', true);
+                $('[name^=DIAGHIGHTPERFORM_]').val(0);
+            } else {
+                $('#premium_search').html('');
+                changeSelectBtnColor($(this), 'off');
+            }
+
+            // 検索する組織の属性を取得
+            var radio_id = $(this).attr('id');
+            if (radio_id.indexOf('personal') >= 0) {
+                $('#form_ORGDIAG_ATTR').val('personal');
+            } else if (radio_id.indexOf('label') >= 0) {
+                $('#form_ORGDIAG_ATTR').val('label');
+            } else if (radio_id.indexOf('dept') >= 0) {
+                $('#form_ORGDIAG_ATTR').val('dept');
+            } else {
+                $('#form_ORGDIAG_ATTR').val('org');
+            }
+        });
+    }
+
+    /**
+     * 事業フェーズセレクト表示
+     */
+    function set_growthtypes_checkbox() {
+        // init
+        $.each($('[name^=GROWTHTYPE_LARGE]'), function() {
+            var text       = $(this).parent('label').text();
+            var growthtype = $(this).val();
+
+            // 改行以下の文言と不要なスペースを削除
+            text = text.replace(/\n(\s*)/g, '').replace(/タイプ(.*)/g, 'タイプ');
+
+            if ($(this).prop('checked')) {
+                if ($('#premium_search').html() == '' || $('#premium_search').html().match(/組織診断(.*)/)) {
+                    $('#premium_search').html('個別コンピテンシー：<span id="premium_selected"></span>に一致');
+                }
+                $('#premium_selected').append('<label id=growthtype_checked_label_'+growthtype+'>'+text+'</label>');
+
+                // 組織診断の検索条件を初期化
+                changeSelectBtnColor($(this), 'off');
+            }
+        });
+
+        // add click event
+        $('[name^=GROWTHTYPE_LARGE]').click(function() {
+            var text       = $(this).parent('label').text();
+            var growthtype = $(this).val();
+
+            // 改行以下の文言と不要なスペースを削除
+            text = text.replace(/\n(\s*)/g, '').replace(/タイプ(.*)/g, 'タイプ');
+
+            if ($(this).prop('checked')) {
+                if ($('#premium_search').html() == '' || $('#premium_search').html().match(/組織診断(.*)/)) {
+                    $('#premium_search').html('個別コンピテンシー：<span id="premium_selected"></span>に一致');
+                }
+                $('#premium_selected').append('<label id=growthtype_checked_label_'+growthtype+'>'+text+'</label>');
+
+                // 組織診断の検索条件を初期化
+                changeSelectBtnColor($(this), 'off');
+            } else {
+                $('#growthtype_checked_label_'+growthtype).remove();
+                if ($('#premium_selected').html() == '') {
+                    $('#premium_search').html('');
+                }
+            }
+        });
+    }
+
+    /**
+     * ビジネスパフォーマンス偏差値セレクト挙動設定
+     */
+    function set_business_deviation_list() {
+        // init
+        var select_val = $('#form_BUSINESS_DEVIATION').val();
+
+        if (select_val > 0) {
+            var name     = 'ビジネスパフォーマンス偏差値';
+            var val_disp = $('#form_BUSINESS_DEVIATION').find('option:selected').text();
+
+            if ($('#premium_search').html() == '' || $('#premium_search').html().match(/組織診断(.*)/)) {
+                $('#premium_search').html('個別コンピテンシー：<span id="premium_selected"></span>に一致');
+            }
+
+            if ($('#deviation_selected_label')[0]) {
+                $('#deviation_selected_label').text(name+'['+val_disp+']');
+            } else {
+                $('#premium_selected').append('<label id=deviation_selected_label>'+name+'['+val_disp+']</label>');
+            }
+
+            // 組織診断の検索条件を初期化
+            changeSelectBtnColor('', 'off');
+        }
+
+        $('#form_BUSINESS_DEVIATION').change(function() {
+            var select_val  = $(this).val();
+
+            if (select_val > 0) {
+                var name     = 'ビジネスパフォーマンス偏差値';
+                var val_disp = $(this).find('option:selected').text();
+
+                if ($('#premium_search').html() == '' || $('#premium_search').html().match(/組織診断(.*)/)) {
+                    $('#premium_search').html('個別コンピテンシー：<span id="premium_selected"></span>に一致');
+                }
+
+                if ($('#deviation_selected_label')[0]) {
+                    $('#deviation_selected_label').text(name+'['+val_disp+']');
+                } else {
+                    $('#premium_selected').append('<label id=deviation_selected_label>'+name+'['+val_disp+']</label>');
+                }
+
+                // 組織診断の検索条件を初期化
+                changeSelectBtnColor('', 'off');
+            } else {
+                $('#deviation_selected_label').remove();
+                if ($('#premium_selected').html() == '') {
+                    $('#premium_search').html('');
+                }
+            }
+        });
+    }
+
+    /**
+     * コンピテンシー偏差値セレクト挙動設定
+     */
+    function set_competency_list() {
+        // init
+        $.each($('[id^=form_DIAGHIGHTPERFORM_]'), function() {
+            var select_comp = $(this).attr('id').replace(/form_DIAGHIGHTPERFORM_/g, '');
+            select_comp     = select_comp.toLowerCase();
+            var select_val  = $(this).val();
+
+            if (select_val > 0) {
+                var name     = $(this).parent().siblings('.comp').text();
+                var val_disp = $(this).find('option:selected').text();
+
+                if ($('#premium_search').html() == '' || $('#premium_search').html().match(/組織診断(.*)/)) {
+                    $('#premium_search').html('個別コンピテンシー：<span id="premium_selected"></span>に一致');
+                }
+
+                if ($('#comp_selected_label_'+select_comp)[0]) {
+                    $('#comp_selected_label_'+select_comp).text(name+'['+val_disp+']');
+                } else {
+                    $('#premium_selected').append('<label id=comp_selected_label_'+select_comp+'>'+name+'['+val_disp+']</label>');
+                }
+
+                // 組織診断の検索条件を初期化
+                changeSelectBtnColor('', 'off');
+            }
+        });
+
+        $('[id^=form_DIAGHIGHTPERFORM_]').change(function() {
+            var select_comp = $(this).attr('id').replace(/form_DIAGHIGHTPERFORM_/g, '');
+            select_comp     = select_comp.toLowerCase();
+            var select_val  = $(this).val();
+
+            if (select_val > 0) {
+                var name     = $(this).parent().siblings('.comp').text();
+                var val_disp = $(this).find('option:selected').text();
+
+                if ($('#premium_search').html() == '' || $('#premium_search').html().match(/組織診断(.*)/)) {
+                    $('#premium_search').html('個別コンピテンシー：<span id="premium_selected"></span>に一致');
+                }
+
+                if ($('#comp_selected_label_'+select_comp)[0]) {
+                    $('#comp_selected_label_'+select_comp).text(name+'['+val_disp+']');
+                } else {
+                    $('#premium_selected').append('<label id=comp_selected_label_'+select_comp+'>'+name+'['+val_disp+']</label>');
+                }
+
+                // 組織診断の検索条件を初期化
+                changeSelectBtnColor('', 'off');
+            } else {
+                $('#comp_selected_label_'+select_comp).remove();
+                if ($('#premium_selected').html() == '') {
+                    $('#premium_search').html('');
+                }
+            }
+        });
+    }
+
+    /**
+     * 検索履歴の表示
+     */
+    function set_history_list() {
+        var target_form = '#search-form';
+        var max_data    = 5;
+        var company_member_id = $('#current_user').data('company-member-id');
+        var list_key = 'search_history_list_' + (company_member_id ? ('cmember_' + company_member_id) : '');
+        if (/standard/.test(location.pathname)) {
+            list_key += 'standard';
+        }
+        if (/global/.test(location.pathname)) {
+            list_key += 'global';
+        }
+        if (/athlete/.test(location.pathname)) {
+            list_key += 'athlete';
+        }
+
+        var list = [];
+        var storage_data;
+        try {
+            storage_data = localStorage.getItem(list_key);
+        } catch (e) {}
+        if (storage_data) {
+            list = $.parseJSON(storage_data);
+        }
+
+        // show list
+        var template = $('.reference_lately--student');
+        for (var i = 0; i < list.length; i++) {
+            var form_data = localStorage.getItem(list[i]);
+            if (form_data) {
+                var tmp = template.clone();
+                tmp.find('dt').html(list[i]);
+                tmp.find('dd').html(make_history_list_name($.parseJSON(form_data)));
+                tmp.data('search-date', list[i]);
+                $('#reference_lately--student_list').append(tmp);
+                tmp.show();
+            }
+        }
+
+        // save
+        $(target_form).submit(function() {
+            var save_data = {};
+            $.each($(target_form).serializeArray(), function(index, obj) {
+                if (save_data[obj.name]) {
+                    var tmp = save_data[obj.name];
+                    if ($.isArray(tmp)) {
+                        tmp.push(obj.value);
+                    } else {
+                        tmp = [tmp, obj.value];
+                    }
+                    save_data[obj.name] = tmp;
+                } else {
+                    save_data[obj.name] = obj.value;
+                }
+            });
+
+            var now_date = new Date().toLocaleString();
+            list.push(now_date);
+            if (list.length > max_data) {
+                localStorage.removeItem(list[0]);
+                list.splice(0, 1);
+            }
+
+            localStorage.setItem(list_key, JSON.stringify(list));
+            localStorage.setItem(now_date, JSON.stringify(save_data));
+        });
+
+        // re-search
+        $('.reference_lately--student').click(function() {
+            // pre_search_countを行わない
+            window.sessionStorage.setItem('pre_search_count_flg', false);
+
+            var form_data = localStorage.getItem($(this).data('search-date'));
+            set_form_data($.parseJSON(form_data), $(target_form));
+            $(target_form).submit();
+        });
+
+        function make_history_list_name(data) {
+            var txt = '';
+
+            var tmp = [];
+            if (data['male']) tmp.push('男性');
+            if (data['female']) tmp.push('女性');
+            if (data['otherwise']) tmp.push('その他');
+            txt += (tmp.length > 0)? '性別:' + tmp.join(',') : '';
+
+            tmp = make_name_array('学校グループ', 'COLLEGELANK_', data);
+            if (tmp.length > 0) {
+                txt += (txt.length > 0) ? '/' : '';
+                txt += tmp;
+            }
+
+            tmp = make_name_array('専攻', 'BUNRI_', data);
+            if ((data['BUNKEI'])) {
+                if (tmp) {
+                    tmp += ',文系';
+                } else {
+                    tmp = '専攻:文系';
+                }
+            }
+            if ((data['RIKEI'])) {
+                if (tmp) {
+                    tmp += ',理系';
+                } else {
+                    tmp = '専攻:理系';
+                }
+            }
+            if (tmp.length > 0) {
+                txt += (txt.length > 0) ? '/' : '';
+                txt += tmp;
+            }
+
+            tmp = make_name_array('現住所', 'PREFECTURE_', data);
+            // エリア部分のテキストを削除(選択された都道府県のみを表示するため)
+            tmp = tmp.replace(/(▼.*?,)/g, '');
+            if (tmp.length > 0) {
+                txt += (txt.length > 0) ? '/' : '';
+                txt += tmp;
+            }
+
+            tmp = make_name_array('志望勤務地', 'WISH_RGN_', data);
+            tmp = tmp.replace('第1志望のみ,第2志望以降も含む','');
+            tmp = tmp.replace('第1志望のみ,第2志望以降も含む,','');
+            if (tmp == '志望勤務地:') {
+                tmp = '';
+            }
+            if (tmp.length > 0) {
+                txt += (txt.length > 0) ? '/' : '';
+                tmp = tmp.replace(':,', ':');
+                txt += tmp;
+            }
+
+            tmp = make_name_array('志望企業タイプ', 'WISH_COMPANY_', data);
+            if (tmp.length > 0) {
+                txt += (txt.length > 0) ? '/' : '';
+                txt += tmp;
+            }
+
+            if (data['EVENTSUGGEST'] == 1) {
+                txt += (txt.length > 0) ? '/' : '';
+                txt += 'イベント承認済みおよび参加済み学生' + tmp;
+            }
+
+            tmp = make_name_array('学校系統', 'COLLEGEOWNER_', data);
+            if (tmp.length > 0) {
+                txt += (txt.length > 0) ? '/' : '';
+                txt += tmp;
+            }
+
+            tmp = [];
+            if (data['college']) tmp.push('大学');
+            if (data['postgraduate']) tmp.push('大学院(修士課程)');
+            if (data['doctoralcourse']) tmp.push('大学院(博士課程)');
+            if (data['juniorcollege']) tmp.push('短大');
+            if (data['abroad']) tmp.push('海外の学校');
+            if (data['specialschool']) tmp.push('専門学校');
+            if (data['teccollege']) tmp.push('高専');
+            if (data['other']) tmp.push('その他');
+            if (tmp.length > 0) {
+                txt += (txt.length > 0) ? '/' : '';
+                txt += '学校区分:' + tmp.join(',');
+            }
+
+            if (data['COLLEGE'] > 0 && typeof data['COLLEGE'] === 'string') {
+                tmp = $('#form_COLLEGE').find('option[value='+data['COLLEGE']+']').text();
+                if (tmp.length > 0) {
+                    txt += (txt.length > 0) ? '/' : '';
+                    txt += '大学名:' + tmp;
+                }
+            } else if (typeof(data['COLLEGE[]']) != 'undefined') {
+                var temp_result = [];
+                $.each(data['COLLEGE[]'], function(index, value) {
+                    var college_name = $('#form_COLLEGE').find('option[value='+value+']').text();
+                    temp_result.push(college_name);
+                });
+                txt += (txt.length > 0) ? '/' : '';
+                txt += (temp_result.length > 0) ? '大学名:'+temp_result.join(',') : '';
+            }
+
+            tmp = $('[name=DEPARTMENT]').val();
+            if (tmp && tmp.length > 0) {
+                txt += (txt.length > 0) ? '/' : '';
+                txt += '学部:' + tmp;
+            }
+
+            tmp = $('[name=COURSE]').val();
+            if (tmp && tmp.length > 0) {
+                txt += (txt.length > 0) ? '/' : '';
+                txt += '学科:' + tmp;
+            }
+
+            tmp = [];
+            if (data['option2']) {
+                tmp.push($('[name=option2][value='+data['option2']+']').next().text());
+            }
+            if (tmp.length > 0) {
+                txt += (txt.length > 0) ? '/' : '';
+                txt += '学生区分:' + tmp.join(',');
+            }
+
+            if (data['INTERNPERIOD'] > 0) {
+                tmp = $('#form_ABROADPERIODSTD_'+data['INTERNPERIOD']).next().text();
+                if (tmp.length > 0) {
+                    txt += (txt.length > 0) ? '/' : '';
+                    txt += 'インターン経験期間:' + tmp;
+                }
+            }
+
+            if (data['ABROADPERIODSTD'] > 0) {
+                tmp = $('#form_ABROADPERIODSTD_'+data['ABROADPERIODSTD']).next().text();
+                if (tmp.length > 0) {
+                    txt += (txt.length > 0) ? '/' : '';
+                    txt += '留学経験期間:' + tmp;
+                }
+            }
+
+            tmp = [];
+            if (data['sports']) tmp.push('体育会系(サークル)');
+            if (data['culture']) tmp.push('文化系(サークル)');
+            if (data['sportsclub']) tmp.push('体育会系(部活)');
+            if (data['cultureclub']) tmp.push('文化系(部活)');
+            if (data['sorc_other']) tmp.push('どちらでもない');
+            if (tmp.length > 0) {
+                txt += (txt.length > 0) ? '/' : '';
+                txt += 'クラブ活動区分:' + tmp.join(',');
+            }
+
+            tmp = $('[name=CLUB]').val();
+            if (tmp && tmp.length > 0) {
+                txt += (txt.length > 0) ? '/' : '';
+                txt += 'クラブ活動:' + tmp;
+            }
+
+            tmp = $('[name=CIRCLE]').val();
+            if (tmp && tmp.length > 0) {
+                txt += (txt.length > 0) ? '/' : '';
+                txt += 'サークル:' + tmp;
+            }
+
+            if (data['WISH_INTERNSHIP'] == 1) {
+                txt += (txt.length > 0) ? '/' : '';
+                txt += 'インターンシップ参加希望:' + tmp;
+            }
+
+            if (data['WISH_IND[]']) {
+                tmp = $('#form_WISH_IND').next().find('.ms-choice span').text();
+                if (tmp && tmp.length > 0) {
+                    txt += (txt.length > 0) ? '/' : '';
+                    txt += '詳細志望業界:' + tmp;
+                }
+            }
+
+            if (data['WISH_OCP[]']) {
+                tmp = $('#form_WISH_OCP').next().find('.ms-choice span').text();
+                if (tmp && tmp.length > 0) {
+                    txt += (txt.length > 0) ? '/' : '';
+                    txt += '志望職種:' + tmp;
+                }
+            }
+
+            if (data['WISH_CC[]']) {
+                tmp = $('#form_WISH_CC').next().find('.ms-choice span').text();
+                if (tmp && tmp.length > 0) {
+                    txt += (txt.length > 0) ? '/' : '';
+                    txt += '企業選びの軸:' + tmp;
+                }
+            }
+
+            if (data['EXLV'] > 0) {
+                tmp = $('#form_EXLV').find('[value='+data['EXLV']+']').text();
+                if (tmp && tmp.length > 0) {
+                    txt += (txt.length > 0) ? '/' : '';
+                    txt += 'TOEIC:' + tmp;
+                }
+            }
+
+            if (data['EXLVTOEFL'] > 0) {
+                tmp = $('#form_EXLVTOEFL').find('[value='+data['EXLVTOEFL']+']').text();
+                if (tmp && tmp.length > 0) {
+                    txt += (txt.length > 0) ? '/' : '';
+                    txt += 'TOEFL:' + tmp;
+                }
+            }
+
+            if (data['EXLVIELTS'] > 0) {
+                tmp = $('#form_EXLVIELTS').find('[value='+data['EXLVIELTS']+']').text();
+                if (tmp && tmp.length > 0) {
+                    txt += (txt.length > 0) ? '/' : '';
+                    txt += 'IELTS:' + tmp;
+                }
+            }
+
+            tmp = make_name_array('外国語資格', 'LANGUAGE_', data);
+            if (tmp && tmp.length > 0) {
+                txt += (txt.length > 0) ? '/' : '';
+                txt += tmp;
+            }
+
+            if (data['SL'] > 0) {
+                tmp = $('#form_SL').find('[value='+data['SL']+']').text();
+                if (tmp && tmp.length > 0) {
+                    txt += (txt.length > 0) ? '/' : '';
+                    txt += '特殊資格:' + tmp;
+                }
+            }
+
+            if (data['IT'] > 0) {
+                tmp = $('#form_IT').find('[value='+data['IT']+']').text();
+                if (tmp && tmp.length > 0) {
+                    txt += (txt.length > 0) ? '/' : '';
+                    txt += 'コンピューター資格:' + tmp;
+                }
+            }
+
+            if (data['IPA'] > 0) {
+                tmp = $('#form_IPA').find('[value='+data['IPA']+']').text();
+                if (tmp && tmp.length > 0) {
+                    txt += (txt.length > 0) ? '/' : '';
+                    txt += '情報処理技術者資格:' + tmp;
+                }
+            }
+
+            tmp = make_name_array('PG言語', 'PG_', data);
+            if (tmp && tmp.length > 0) {
+                txt += (txt.length > 0) ? '/' : '';
+                txt += tmp;
+            }
+
+            if (data['OFFER_LOWER'] != '' || data['OFFER_UPPER'] != '') {
+                var lower = $('#form_OFFER_LOWER').find('[value='+data['OFFER_LOWER']+']').text();
+                var upper = $('#form_OFFER_UPPER').find('[value='+data['OFFER_UPPER']+']').text();
+
+                if (lower.length > 0) {
+                    txt += (txt.length > 0) ? '/' : '';
+                    txt += 'オファー承認数:' + lower;
+                }
+
+                if (upper.length > 0) {
+                    if (lower.length > 0) {
+                        txt += '〜' + upper;
+                    } else {
+                        txt += (txt.length > 0) ? '/' : '';
+                        txt += 'オファー承認数:〜' + upper;
+                    }
+                } else if (lower.length > 0) {
+                    txt += '〜';
+                }
+            }
+
+            tmp = $('[name=KEYWORD]').val();
+            if (tmp && tmp.length > 0) {
+                txt += (txt.length > 0) ? '/' : '';
+                txt += 'フリーワード:' + tmp;
+            }
+
+            if (data['loginterm']) {
+                tmp = data['loginterm'];
+                if (tmp > 0) {
+                    txt += (txt.length > 0) ? '/' : '';
+                    txt += 'ログイン日時:' + tmp + '日以内';
+                }
+            }
+
+            tmp = make_name_array('採用年度', 'HIREYEAR_', data);
+            if (tmp && tmp.length > 0) {
+                txt += (txt.length > 0) ? '/' : '';
+                txt += tmp;
+            }
+
+            tmp = [];
+            if (data['ABROADREGION'] > 0) {
+                tmp.push('地域-' + $('#form_ABROADREGION').find('[value='+data['ABROADREGION']+']').text());
+            }
+            if (data['ABROADCOUNTRYNUM'] && (data['ABROADCOUNTRYNUM'] % 100) != 0) {
+                tmp.push('国-' + $('#form_ABROADCOUNTRYNUM').find('[value='+data['ABROADCOUNTRYNUM']+']').text());
+            }
+            if (data['ABROADCOLLEGE'] > 0) {
+                tmp.push('大学-' + $('#form_ABROADCOLLEGE').find('[value='+data['ABROADCOLLEGE']+']').text());
+            }
+            if (data['ABROADPERIOD'] > 0) {
+                tmp.push('期間-' + $('[name=ABROADPERIOD][value='+data['ABROADPERIOD']+']').next().text());
+            }
+            if (tmp && tmp.length > 0) {
+                txt += (txt.length > 0) ? '/' : '';
+                txt += '海外経験:' + tmp.join(',');
+            }
+
+            tmp = [];
+            if (data['RETURNSDATE']) {
+                tmp.push(data['RETURNSDATE']);
+            }
+            if (data['RETURNEDATE']) {
+                tmp.push(data['RETURNEDATE']);
+            }
+            if (tmp && tmp.length > 0) {
+                txt += (txt.length > 0) ? '/' : '';
+                txt += '帰国日:' + tmp.join('~');
+            }
+
+            tmp = make_name_array('競技', 'SPORTSKIND_', data);
+            if (tmp && tmp.length > 0) {
+                txt += (txt.length > 0) ? '/' : '';
+                txt += tmp;
+            }
+
+            tmp = make_name_array('役割', 'CLUBROLE_', data);
+            if (tmp && tmp.length > 0) {
+                txt += (txt.length > 0) ? '/' : '';
+                txt += tmp;
+            }
+
+            tmp = make_name_array('入学経路', 'ENROLLEMENTKIND_', data);
+            if (tmp && tmp.length > 0) {
+                txt += (txt.length > 0) ? '/' : '';
+                txt += tmp;
+            }
+
+            tmp = make_name_array('プロフィール入力率', 'SEARCHPROGRESS_', data);
+            if (tmp && tmp.length > 0) {
+                txt += (txt.length > 0) ? '/' : '';
+                txt += tmp;
+            }
+
+            if (data['WISH_PUBLICSERVANT']) {
+                txt += (txt.length > 0) ? '/' : '';
+                txt += '公務員志望';
+            }
+
+            tmp = [];
+            if (data['ORGDIAG_ID']) {
+                var str = $('#form_orgdiag_'+data['ORGDIAG_ATTR']+'_'+data['ORGDIAG_ID']).parent().next().find('.info_title').text();
+                tmp.push($.trim(str).split(/\s{4}/)[0]);
+                txt += (txt.length > 0) ? '/' : '';
+                txt += '組織診断結果:' + tmp.join(',');
+            }
+
+            tmp = [];
+            if (data['GROWTHTYPE_LARGE[]']) {
+                $.each(data['GROWTHTYPE_LARGE[]'], function(index, val) {
+                    var str = $('#form_GROWTHTYPE_LARGE_'+val).parent('label').text();
+                    tmp.push($.trim(str).split(/\s{4}/)[0]);
+                });
+                txt += (txt.length > 0) ? '/' : '';
+                txt += '事業タイプ:' + tmp.join(',');
+            }
+
+            if (data['BUSINESS_DEVIATION'] > 0) {
+                txt += '/ビジネス偏差値:' + $('#form_BUSINESS_DEVIATION option[value='+data['BUSINESS_DEVIATION']+']').text();
+            }
+
+            tmp = [];
+            $.each($('[name^=DIAGHIGHTPERFORM_]'), function() {
+                var name = $(this).attr('name');
+                if (data[name] > 0) {
+                    var comp = $(this).parents('.competency').find('.comp').text();
+                    var num  = $(this).find('option[value='+data[name]+']').text();
+                    tmp.push(comp + '-' + num);
+                }
+            });
+            if (tmp && tmp.length > 0) {
+                txt += (txt.length > 0) ? '/' : '';
+                txt += 'コンピテンシー:' + tmp.join(',');
+            }
+
+            var competence_search_tmp = '';
+            // 活躍人材検索
+            if (data.competence_search_flag == '1') {
+                competence_search_tmp += '偏差値' + data.activepersonal_score + '以上の活躍人材';
+            }
+            // 高評価学生検索
+            if (data.competence_search_flag == '2') {
+                competence_search_tmp += '偏差値' + data.activestudent_score + '以上の高評価学生';
+            }
+            // オリジナル活躍人材検索
+            if (data.competence_search_flag == '3') {
+                var ef1g_analyze = $('[name=ef1g_analyze_percent]:checked').next().text();
+                if (ef1g_analyze) {
+                    competence_search_tmp += ef1g_analyze + 'のオリジナル活躍人材';
+                }
+            }
+            // 職種適性
+            var job = _.map(data['ef1g_job[]'], function(val) {
+                var text = $('input[name="ef1g_job[]"][value="'+val+'"]').parent().text();
+                return $.trim(text);
+            });
+            if (job.length > 0) {
+                competence_search_tmp += '[職種適性]' + job.join(',');
+            }
+
+            // 似た人検索(40の人材像マップ)
+            var personality_map_tmp = [];
+            // 適性診断eF-1G項目
+            var ef1g_column_tmp = [];
+            // 社会人基礎力
+            var ef1g_power_tmp = [];
+
+            Object.keys(data).forEach(function(key) {
+                if (key.match(/^personality_map_val.+$/)) {
+                    var ary = data[key].split(',');
+                    personality_map_tmp.push('Type' + ary[0].replace(/CL/g , '') + ary[1]);
+                }
+                if (data.competence_search_flag != '') {
+                    return;
+                }
+                if (key.match(/^ef1g_column_max_.+$/)) {
+                    var column_max = data[key];
+                    var column_min = data[key.replace(/max/g , 'min')];
+
+                    if ((column_max && column_max !== '80') || (column_min && column_min !== '20')) {
+                        var text = $('input[name="' + key +'"]').parent().prev().text();
+                        ef1g_column_tmp.push(text + column_min + '~' + column_max);
+                    }
+                }
+                if (key.match(/^ef1g_power_max_.+$/)) {
+                    var power_max = data[key];
+                    var power_min = data[key.replace(/max/g , 'min')];
+                    var title_tag = key.replace(/_max/g , '') + '_title';
+
+                    if ((power_max && power_max !== '80') || (power_min && power_min !== '20')) {
+                        var text = $('[name="' + title_tag +'"]').text();
+                        ef1g_power_tmp.push(text + convert_display_power(power_min) + '~' + convert_display_power(power_max));
+                    }
+                }
+            });
+
+            if (personality_map_tmp.length > 0) {
+                competence_search_tmp += '[人材像]' + personality_map_tmp.join(',');
+            }
+
+            if (ef1g_column_tmp.length > 0) {
+                competence_search_tmp += '[eF-1G項目]' + ef1g_column_tmp.join(',');
+            }
+
+            if (ef1g_power_tmp.length > 0) {
+                competence_search_tmp += '[社会人基礎力]' + ef1g_power_tmp.join(',');
+            }
+
+            if (competence_search_tmp.length > 0) {
+                txt += (txt.length > 0) ? '/' : '';
+                txt += '適性検索:' + competence_search_tmp;
+            }
+
+            if (txt == '') {
+                txt = 'デフォルト検索';
+            }
+
+            return $('<div />').text(txt).html();
+        }
+
+        function make_name_array(area_name, attr_name, data) {
+            var tmp_array = [];
+            $.each($('[name^='+attr_name+']'), function() {
+                var name_attr = $(this).attr('name');
+                if (data[name_attr]) {
+                    tmp_array.push($(this).next().text());
+                }
+            });
+
+            if (tmp_array.length > 0) {
+                return area_name + ':' + tmp_array.join(',');
+            } else {
+                return '';
+            }
+        }
+
+    }
+
+    /**
+     * 社会人基礎力の値を表示用の値に変換する
+     * @param power
+     */
+    function convert_display_power(power) {
+        power = Number(power);
+        if (50.5 < power) {
+            // スコア：プラス値
+            if (66.1 < power) {
+                return 5; // 66.2以上、80以下
+            } else if (62.5 < power) {
+                return 4.5; // 62.6以上、66.1以下
+            } else if (60.1 < power) {
+                return 4; // 60.2以上、62.5以下
+            } else if (58.2 < power) {
+                return 3.5; // 58.3以上、60.1以下
+            } else if (56.6 < power) {
+                return 3; // 56.7以上、58.2以下
+            } else if (55.2 < power) {
+                return 2.5; // 55.3以上、56.6以下
+            } else if (53.9 < power) {
+                return 2; // 54以上、55.2以下
+            } else if (52.7 < power) {
+                return 1.5; // 52.8以上、53.9以下
+            } else if (51.6 < power) {
+                return 1; // 51.7以上、52.7以下
+            }
+            return 0.5; // 50.6以上、51.6以下
+        } else if (power < 49.5) {
+            // スコア：マイナス値
+            if (48.3 < power) {
+                return -0.5; // 48.4以上、49.4以下
+            } else if (47.2 < power) {
+                return -1; // 47.3以上、48.3以下
+            } else if (46 < power) {
+                return -1.5; // 46.1以上、47.2以下
+            } else if (44.7 < power) {
+                return -2; //44.8以上、46以下
+            } else if (43.3 < power) {
+                return -2.5; // 43.4以上、44.7以下
+            } else if (41.7 < power) {
+                return -3; // 41.8以上、43.3以下
+            } else if (39.8 < power) {
+                return -3.5; // 39.9以上、41.7以下
+            } else if (37.4 < power) {
+                return -4; // 37.5以上、39.8以下
+            } else if (33.8 < power) {
+                return -4.5; // 33.9以上、37.4以下
+            }
+            return -5; // 20以上、33.8以下
+        }
+        return 0; // 49.5以上、50.5以下
+    }
+
+    /**
+     * 検索条件リストの表示
+     */
+    function set_search_list(limit, offset, isShared) {
+        var target;
+        if (isShared) {
+            target = $('#reference_shared_terms');
+        } else {
+            target = $('#reference_terms');
+        }
+        target.find('.loding').show();
+
+        var from_distributor = $('#from_distributor_for_company_view_mode').val();
+        var company_id = $('#company_id_for_company_view_mode').val();
+
+        $.ajax({
+            url      : '/api/company/studentsearch/search_list',
+            type     : 'GET',
+            dataType : 'json',
+            cache    : false,
+            data     : {
+                limit      : limit,
+                offset     : offset,
+                share      : isShared,
+                company_id : company_id,
+                from_distributor : from_distributor,
+            }
+        }).done(function(res) {
+            if (res.result) {
+                var list_template = target.find('.c-searchlist:first').clone();
+
+                if(typeof res.temp_table_error != 'undefined'){
+                    target.html('<div class="alert alert-danger"><b>エラーが発生しました。大変お手数ですが、しばらく経ってから再度お試しいただくか、画面を読み込み直してください。</b></div>');
+                    return false;
+                }
+                $.each(res.list, function(index, val) {
+                    var is_share = val.is_share === '1' ? true : false;
+                    var tmp = list_template.clone();
+                    tmp.find('.c-searchlist--title').html(val.title);
+                    if (val.kind > 0) {
+                        tmp.find('.c-searchlist--title').after($('<p />').addClass('ofb-label ofb-label--small mb10'));
+                        if (val.kind == 1) {
+                            tmp.find('.ofb-label').addClass('ofb-label--global').html('Global');
+                        } else if (val.kind == 2) {
+                            tmp.find('.ofb-label').addClass('ofb-label--athlete').html('Athlete');
+                        }
+                    }
+                    tmp.find('.can_offer em').html(val.cnt.enablecnt);
+                    tmp.find('.new-arrivals').html(val.cnt.lastcnt);
+                    tmp.find('.approved_offer em').html(val.cnt.offercnt);
+                    if (val.condition.COLLEGE && typeof val.condition.COLLEGE.join == 'function') {
+                        val.condition.COLLEGE = val.condition.COLLEGE.join();
+                    }
+                    tmp.find('.c-searchlist--point-share-name').html(val.owner_member_name);
+                    tmp.find('.update-switch').attr({
+                        'id': 'update-share-searchlist-' + val.id,
+                        'data-searchlist-id': val.id
+                    });
+                    tmp.find('#update-share-searchlist-' + val.id).prop({'checked': is_share});
+                    tmp.find('.update-switch-label').attr({'for': 'update-share-searchlist-' + val.id});
+
+                    tmp.find('.c-searchlist--search').attr('data-param', $.param(val.condition));
+                    tmp.find('.c-searchlist--delete').attr('data-order-no', val.order);
+                    target.append(tmp);
+                    tmp.show();
+                });
+
+                // 「次のリストを読み込む」の追加削除
+                target.find('.c-searchlist--next').remove();
+                if (!res.is_end) {
+                    target.append($('<div />').addClass('c-searchlist--next mt10 mb10 centered').text('次のリストを読み込む'));
+                }
+
+                // リストを全て読み込み終わっているか
+                if (isShared) {
+                    window.sessionStorage.setItem('shared_searchlist_end', res.is_end);
+                } else {
+                    window.sessionStorage.setItem('searchlist_end', res.is_end);
+                }
+
+                offset_stop = false;
+                shared_csearchlist_offset_stop = false;
+
+                $('.icon__student-score').tooltip();
+            } else {
+                if(typeof res.previous_hire_year != 'undefined'){
+                    $('.js-previous-year-search').show();
+                    return false;
+                }
+                alert(res.error);
+            }
+        }).always(function() {
+            // 閲覧履歴学生
+            if (!set_history) {
+                set_student_browse_history();
+                set_history = true;
+            }
+
+            target.find('.loding').hide();
+        });
+
+    }
+
+    function update_share_search_list() {
+        $(document).on('change', '.update-switch', function() {
+            var updateSwitch = $(this);
+            var searchlistId = updateSwitch.data('searchlist-id');
+            var isShare = updateSwitch.prop('checked') === true ? 1 : 0;
+            updateSwitch.prop({'disabled':true});
+            $.ajax({
+                url      : '/api/company/studentsearch/search_list_is_share',
+                type     : 'POST',
+                dataType : 'json',
+                cache    : false,
+                data     : {
+                    searchlist_id : searchlistId,
+                    is_share : isShare,
+                }
+            }).done(function(res, textStatus, jqXHR) {
+                if (jqXHR.status === 200) {
+                    alert(res.info);
+                    updateSwitch.prop('checked', res.is_share);
+                }
+            }).fail(function (jqXHR) {
+                var resText = JSON.parse(jqXHR.responseText);
+                alert('通信に失敗しました。しばらく経ってから再度お試しいただくか、インターネット環境をご確認ください。\n' + resText.errors);
+                // エラーの場合は元に戻す
+                updateSwitch.prop('checked', !isShare);
+            }).always(function() {
+                // イベント解除
+                $('.update-switch').off('change');
+                updateSwitch.prop({'disabled':false});
+            });
+        })
+    }
+
+    /**
+     * 検索条件リストの保存・削除・検索
+     */
+    var now_saving = null;
+    var now_deleting = null;
+    function set_search_list_control() {
+        $(document).on('click', '.search_list_add', function(event) {
+            if (now_saving) {
+                return;
+            }
+
+            var btn = $(this);
+            btn.prop("disabled", true);
+
+            var form_data = make_search_params();
+            var targetDOM = event.currentTarget.closest('.search_list_add_parent_target');
+            form_data.title = targetDOM.querySelector('#search_list_title').value;
+            form_data.is_share = targetDOM.querySelector('#search_list_is_share').checked ? 1 : 0;
+            now_saving = $.ajax({
+                url      : '/cstudent/save_search_list',
+                type     : 'POST',
+                dataType : 'json',
+                data     : form_data,
+            }).done(function(res) {
+                if (res.result) {
+                    if (res.prev_cnt < 5 || res.prev_cnt >= 6 && window.sessionStorage.getItem('searchlist_end') == 'true') {
+                        var tmp = $('#myTabContent .c-searchlist:first').clone();
+                        tmp.removeAttr('id');
+                        tmp.find('.c-searchlist--title').html(res.title);
+                        if (res.kind > 0) {
+                            tmp.find('.c-searchlist--title').after($('<p />').addClass('ofb-label ofb-label--small mb10'));
+                            if (res.kind == 1) {
+                                tmp.find('.ofb-label').addClass('ofb-label--global').html('Global');
+                            } else if (res.kind == 2) {
+                                tmp.find('.ofb-label').addClass('ofb-label--athlete').html('Athlete');
+                            }
+                        }
+                        tmp.find('.can_offer em').html(res.cnt.enablecnt);
+                        tmp.find('.new-arrivals').html(res.cnt.lastcnt);
+                        tmp.find('.approved_offer em').html(res.cnt.offercnt);
+                        tmp.find('.favorited_cnt em').html(res.cnt.favcnt);
+                        tmp.find('.hide_cnt em').html(res.cnt.hidecnt);
+
+                        tmp.find('.update-switch').attr({
+                            'id': 'update-share-searchlist-' + res.id,
+                            'data-searchlist-id': res.id
+                        });
+                        tmp.find('#update-share-searchlist-' + res.id).prop({'checked': res.is_share});
+                        tmp.find('.update-switch-label').attr({'for': 'update-share-searchlist-' + res.id});
+
+                        tmp.find('.c-searchlist--search').attr('data-param', $.param(res.condition));
+                        tmp.find('.c-searchlist--delete').attr('data-order-no', res.order);
+                        $('#reference_terms').append(tmp);
+                        tmp.show();
+
+                        alert("保存されました\nトップページの「保存した検索条件」からご確認ください");
+                    } else if (res.prev_cnt == 5) {
+                        offset = 0;
+                        window.sessionStorage.setItem('searchlist_end', false);
+                        $('#reference_terms').append($('<div />').addClass('c-searchlist--next mt10 mb10 centered').text('次のリストを読み込む'));
+                        alert('保存されました。次のリストを読み込むと表示されます。');
+                    } else {
+                        alert('保存されました。次のリストを読み込むと表示されます。');
+                    }
+                } else {
+                    alert(res.error);
+                }
+            }).always(function() {
+                btn.prop("disabled", false);
+                now_saving = null;
+            });
+        });
+
+        $(document).on('click', '.c-searchlist--delete', function() {
+            if (now_deleting) {
+                return;
+            }
+
+            if (!confirm('条件を削除します。\nよろしいですか？')) {
+                return false;
+            }
+
+            var order_no = $(this).data('order-no');
+            var this_row = $(this).parents('.c-searchlist');
+            var company_id = $('#company_id_for_company_view_mode').val();
+            var from_distributor = $('#from_distributor_for_company_view_mode').val();
+            $.ajax({
+                url      : '/cstudent/delete_search_list',
+                type     : 'POST',
+                dataType : 'json',
+                data     : {
+                    'order_no': order_no,
+                    'company_id': company_id,
+                    'from_distributor': from_distributor,
+                }
+            }).done(function(res) {
+                if (res.result) {
+                    this_row.remove();
+                }
+            }).always(function() {
+                now_deleting = null;
+            });
+        });
+
+        $(document).on('click', '.c-searchlist--search', function() {
+            // pre_search_countを行わない
+            window.sessionStorage.setItem('pre_search_count_flg', false);
+
+            var param = $.unserialize($(this).data('param'));
+            param['SUBJOBSEEKST[]']     = param['SUBJOBSEEKST'];
+            param['WISH_IND[]']         = param['WISH_IND'];
+            param['WISH_OCP[]']         = param['WISH_OCP'];
+            param['WISH_CC[]']         = param['WISH_CC'];
+            param['GROWTHTYPE_LARGE[]'] = param['GROWTHTYPE_LARGE'];
+
+            if (param['ef1g_job']) {
+                param['ef1g_job[]'] = param['ef1g_job'];
+            } else {
+                var ef1g_job = [];
+                _.each(param, function(val, key) {
+                    var split = key.split('.');
+                    if (split[0] == 'ef1g_job') {
+                        ef1g_job.push(split[1]);
+                    }
+                });
+                if (ef1g_job.length > 0) {
+                    param['ef1g_job[]'] = ef1g_job;
+                }
+            }
+            param['company_id'] = $('#company_id_for_company_view_mode').val();
+            param['from_distributor'] = $('#from_distributor_for_company_view_mode').val();
+
+            set_form_data(param, $('#search-form'));
+
+            var href = $('#search-form').attr('action') + '&ref=list';
+            $('#search-form').attr('action', href);
+            $('#search-form').submit();
+        });
+    }
+
+    /**
+     * 詳細表示学生履歴表示
+     */
+    function set_student_browse_history() {
+        var company_member_id = $('#current_user').data('company-member-id');
+        var browse_history_key = 'browse_history' + (company_member_id ? ('_cmember_' + company_member_id) : '');
+
+        var storage_data;
+        try {
+            storage_data = localStorage.getItem(browse_history_key);
+        } catch (e) {}
+        if (storage_data) {
+            $.ajax({
+                url      : '/api/company/studentsearch/browse_history_data',
+                type     : 'GET',
+                dataType : 'json',
+                cache    : false,
+                data     : {sid: $.parseJSON(storage_data)}
+            }).done(function(res) {
+
+                // for version
+                for (var key in res) {
+                    var val = res[key];
+                    var view = {
+                        "href"       : '/cstudent/prof/' + val.id,
+                        "img"        : val.img,
+                        "college"    : val.college,
+                        "department" : val.department,
+                        "attr"       : val.attr,
+                        "attr_class" : val.attr_class
+                    };
+                    var template = _.template($('#tmplString').html());
+                    var compiled = template(view);
+                    $('.browse_history__wrapper').append(compiled);
+                }
+
+                // [heightLine.js] 表示中でないと高さが取れないため、一旦表示して戻す
+                var now_active_tab = $('.ofb-tabs li.active a');
+                $('.ofb-tabs a[href=#browsing_lately]').tab('show');
+                $('.browse_history_info').heightLine();
+                now_active_tab.tab('show');
+            });
+
+        }
+    }
+
+    /**
+     * 非同期検索
+     * @return {[type]} [description]
+     */
+    function search_by_ajax(limit, offset) {
+        var params = make_search_params();
+
+        $('#default-result-header').hide();
+        $('#default-result').hide();
+        $('.search_by_ajax_load').show();
+
+        $('.hit-count_loading').show();
+        $('.hit-count').hide();
+
+        $.ajax({
+            url      : '/cstudent/defaultresult',
+            type     : 'POST',
+            dataType : 'json',
+            data     : params
+        }).done(function(res) {
+            $('#default-result-header').html(res.result_header);
+            $('#default-result').html(res.result);
+            $('.hit-num').text(res.cnt);
+        }).fail(function(jqXHR, textStatus, errorThrown) {
+            if (jqXHR.status == 500 && textStatus == "error" && errorThrown == "Internal Server Error") {
+                $('#default-result').html('<div class="alert alert-danger"><b>エラーが発生しました。大変お手数ですが、しばらく経ってから再度お試しいただくか、画面を読み込み直してください。 </b><div class="text-center"><a href="/cstudent" class="btn btn-primary">再読込み</a></div></div>');
+                $('.hit-num').text(0);
+            }
+        }).always(function() {
+            // 検索条件リスト
+            set_search_list(limit, offset, 0);
+            set_search_list(shared_csearchlist_limit, shared_csearchlist_offset, 1);
+
+            $('.search_by_ajax_load').hide();
+            $('.hit-count_loading').hide();
+            $('#default-result-header').show();
+            $('#default-result').show();
+            $('.hit-count').show();
+        });
+    }
+
+    /**
+     * フォームの条件をセット
+     * @param {[type]} data        [description]
+     * @param {[type]} target_form [description]
+     */
+    function set_form_data(data, target_form) {
+        reset_search_form();
+
+        // 学生区分を切り替える
+        if (data['option2'] != undefined) {
+            switch_student_category('#cbox-'+data['option2']);
+        } else {
+            $('.js-searchlist--more2__cbox').prop('checked', false);
+        }
+
+        target_form.find(':input').each(function() {
+            var attr_name = $(this).attr('name');
+            var save_value = data[attr_name];
+
+            if (attr_name == 'SUBJOBSEEKST[]') {
+                for (var key in save_value) {
+                    $('#form_subjobseekst_'+save_value[key]).prop('checked', true);
+                }
+            } else if (attr_name == 'GROWTHTYPE_LARGE[]') {
+                for (var i in save_value) {
+                    $('#form_GROWTHTYPE_LARGE_'+save_value[i]).prop('checked', true);
+                }
+            } else if (attr_name == 'ORGDIAG_ID') {
+                if ($(this).val() == save_value) {
+                    $(this).prop('checked', true);
+                }
+            } else if (attr_name == 'COLLEGE[]') {
+                if (data && data['COLLEGE[]']) {
+                    data['COLLEGE'] = data['COLLEGE[]'];
+                    delete data['COLLEGE[]'];
+                }
+                var values = decodeURIComponent(data['COLLEGE']).split(',');
+                $('#form_COLLEGE').val(values).trigger('change');
+            } else {
+                switch ($(this).attr('type')) {
+                case 'text':
+                case 'hidden':
+                case 'number':
+                    if (save_value != undefined) {
+                        $(this).val(save_value);
+                    } else {
+                        $(this).val('');
+                    }
+                    break;
+                case 'checkbox':
+                    if (save_value != undefined && save_value > 0) {
+                        $(this).prop('checked', true);
+                    } else {
+                        $(this).prop('checked', false);
+                    }
+
+                    // 文理一括対応
+                    if (data['BUNKEI'] == 1) {
+                        $('.bunkei_checkbox').prop('checked', true);
+                    }
+                    if (data['RIKEI'] == 1) {
+                        $('.rikei_checkbox').prop('checked', true);
+                    }
+
+                    if (attr_name == 'ef1g_job[]') {
+                        $(this).prop('checked', false);
+                        if (_.indexOf(save_value, $(this).val()) != -1) {
+                            $(this).prop('checked', true);
+                        }
+                    }
+
+                    break;
+                case 'radio':
+                    if (save_value != undefined) {
+                        $(this).val([save_value]);
+                    }
+                    break;
+                default:
+                    if ($(this).get()[0].tagName.toLowerCase() == 'select') {
+                        if (attr_name == 'PGCR') {
+                            save_value = decodeURIComponent(save_value);
+                        }
+                        if (save_value != undefined) {
+                            $(this).val(save_value);
+                            $(this).change();
+                        }
+                    }
+                    break;
+                }
+            }
+        });
+        // 似た人検索(40の人材像マップ) の設定
+        var personality_map = [];
+        var selectedStyleEl = '';
+        Object.keys(data).forEach(function(key) {
+            if (key.match(/^personality_map_val.+$/)) {
+                personality_map.push(decodeURIComponent(data[key]));
+            }
+        });
+        if (personality_map.length > 0) {
+            personality_map.forEach(function(v, i) {
+                selectedStyleEl += '<input type="hidden" name="personality_map_val[' + i + ']" value="' + v + '"></input>';
+            })
+        }
+        $('#selected_personalitymap_style').html(selectedStyleEl);
+    }
+
+    /**
+     * ワンクリック検索
+     * @return {[type]} [description]
+     */
+    function one_click_search() {
+        $('.oneclicksearch_btn').click(function() {
+            if ($(this).attr('disabled') == 'disabled') {
+                return false;
+            }
+
+            reset_search_form();
+
+            var pref_no = $(this).data('pref-no');
+            if (pref_no) {
+                $('#form_WISH_RGN_'+pref_no).prop('checked', true);
+            }
+
+            //if (pref_no) {
+            //    $('#form_BIRTHPLACE_'+pref_no).prop('checked', true);
+            //}
+
+            var business_no = $(this).data('business-no');
+            if (business_no) {
+                $('#form_WISH_IND').val([business_no]);
+            }
+
+            var params = $(this).data('params');
+            if (params) {
+                _.each(params, function(val, key) {
+                    $('[name='+key+']').val(val);
+                });
+            }
+
+            $('#search-form').submit();
+            return false;
+        });
+    }
+
+    /**
+     * フォームリセット
+     * @return {[type]} [description]
+     */
+    function reset_search_form() {
+        set_pre_search_count_disable();
+
+        $('#search-form').find('textarea, :text, select').val('').end().find(':checked').not('.no-reset').prop('checked', false);
+
+        // modal select init
+        $('#bunkei_show_label').html('');
+        $('#rikei_show_label').html('');
+        $('#other_show_label').html('');
+        $('#prefecture_selected').html('');
+        $('#wishrgn_selected').html('');
+        $('#birthplace_selected').html('');
+        $('#birthplace_athlete_selected').html('');
+        $('#form_WISH_IND').next().find('.ms-choice').find('span').addClass('placeholder').html('志望業界');
+        $('#form_WISH_OCP').next().find('.ms-choice').find('span').addClass('placeholder').html('志望職種');
+        $('#form_WISH_CC').next().find('.ms-choice').find('span').addClass('placeholder').html('企業選びの軸');
+
+        // default on params
+        $('#form_COLLEGE').val(null).trigger('change');
+        $('#form_male').prop('checked', false);
+        $('#form_female').prop('checked', false);
+        $('#form_otherwise').prop('checked', false);
+        $('#form_WISH_RGN_SEL2').prop('checked', true);
+        $('#form_INTERNPERIOD_0').prop('checked', true);
+        $('#form_ABROADPERIODSTD_0').prop('checked', true);
+        $('#form_WISH_IND_SEL2').prop('checked', true);
+        $('#form_WISH_OCP_SEL2').prop('checked', true);
+        $('#form_WISH_CC_SEL2').prop('checked', true);
+        $('#form_logindate_0').prop('checked', true);
+        $('#form_hideofffav').prop('checked', true);
+        $('#form_ABROADPERIOD').prop('checked', true);
+        $('#form_ABROADCOUNTRYNUM').html('<option value="0"></option>');
+        $('#form_ABROADCOLLEGE').html('<option value="0"></option>');
+        $('#form_DIAGHIGHTPERFORMCHOICE[value=2]').prop('checked', true);
+        $('#form_TAGCOND_2').prop('checked', true);
+        $('#form_JOBSEEKST_active').prop('checked', true);
+        $('#global_hireyear').find('input').prop('checked', false);
+        $('#TAGLIST').html('');
+        $('#tags_tagsinput').find('.tag').remove();
+        $('#premium_search').html('');
+        changeSelectBtnColor('', 'off');
+
+        $('[id^="modal-cl--"]').siblings('label').remove();
+
+        $(".js-c-searchlist--more-c").hide();
+        $('.js-searchlist--more2__cbox').prop('checked', false);
+        $('.js-searchcontent--standard').hide();
+        $('.js-searchcontent--global').hide();
+        $('.js-searchcontent--athlete').hide();
+        $('.js-option2-reset').attr('value', true);
+
+        $('.pg-lang>.pg-lang__label').html('');
+
+        set_pre_search_count_enable();
+    }
+
+    function changeSelectBtnColor(obj, onoff) {
+        if (onoff == 'on') {
+            obj.prop('checked', true);
+            obj.next().css({'background': '#2863a8' , 'color': '#fff'});
+            obj.next().text('選択中');
+        } else {
+            $('[id^=form_orgdiag_]').prop('checked', false);
+            $('[id^=form_orgdiag_]').next().css({'background': '#f1f1f1' , 'color': '#333'});
+            $('[id^=form_orgdiag_]').next().text('選択');
+        }
+    }
+});
+
+/**
+ * 検索結果数のリアルタイム表示
+ * @param String serialize  シリアライズ済み検索条件
+ */
+var pre_search_count_enable = true;
+var jqxhr = null;
+function set_search_count(serialize) {
+    if (!pre_search_count_enable) {
+        return;
+    }
+
+    // 連続リクエスト対策
+    if (jqxhr) {
+        // 直前のリクエスト破棄
+        jqxhr.abort();
+    }
+
+    $('.hit-count_loading').show();
+    $('.hit-count').hide();
+    jqxhr = $.ajax({
+        url      : '/api/company/studentsearch/pre_search_count',
+        type     : 'GET',
+        dataType : 'json',
+        data     : serialize
+    }).done(function(res) {
+        if (!res.error) {
+            $('.hit-num').text(res.cnt);
+            $('.hit-count_loading').hide();
+            $('.hit-count').show();
+        }
+    });
+}
+/**
+ * リアルタイム検索数有効化
+ */
+function set_pre_search_count_enable() {
+    pre_search_count_enable = true;
+}
+/**
+ * リアルタイム検索数無効化
+ */
+function set_pre_search_count_disable() {
+    pre_search_count_enable = false;
+}
+
+/**
+ * 非同期件条件作成
+ * @return {[type]} [description]
+ */
+function make_search_params() {
+    var params = {};
+    $.each($('#search-form').serializeArray(), function(i, val) {
+        if (val.name == 'COLLEGE[]') {
+            params['COLLEGE'] = $('#form_COLLEGE').val();
+        } else if (val.name.match(/HIREYEAR_[0-9]{6}/)) {
+            params[val.name.match(/HIREYEAR_[0-9]{6}/)[0]] = 1;
+        } else {
+            params[val.name] = val.value;
+        }
+    });
+
+    params['GROWTHTYPE_LARGE'] = [];
+    $("[name='GROWTHTYPE_LARGE[]']:checked").each(function(){
+        params['GROWTHTYPE_LARGE'].push(this.value);
+    });
+    delete(params['GROWTHTYPE_LARGE[]']);
+
+    params['SUBJOBSEEKST'] = [];
+    $("[name='SUBJOBSEEKST[]']:checked").each(function(){
+        params['SUBJOBSEEKST'].push(this.value);
+    });
+    delete(params['SUBJOBSEEKST[]']);
+
+    params['WISH_IND'] = [];
+    $("[name='WISH_IND[]'] option:selected").each(function(){
+        params['WISH_IND'].push(this.value);
+    });
+    delete(params['WISH_IND[]']);
+
+    params['WISH_OCP'] = [];
+    $("[name='WISH_OCP[]'] option:selected").each(function(){
+        params['WISH_OCP'].push(this.value);
+    });
+    delete(params['WISH_OCP[]']);
+
+    params['WISH_CC'] = [];
+    $("[name='WISH_CC[]'] option:selected").each(function(){
+        params['WISH_CC'].push(this.value);
+    });
+    delete(params['WISH_CC[]']);
+
+    // 活躍人材分析
+    if (params['competence_search_flag'] !== '') {
+        for (var key in params) {
+            if (key.lastIndexOf('ef1g_power', 0) === 0 || key.lastIndexOf('ef1g_column', 0) === 0) {
+                delete(params[key]);
+            }
+        }
+
+        if (params['competence_search_flag'] == 3) {
+            // オリジナル活躍人材検索
+            ef1g_search_flag = 3;
+            var ef1g_analyze_percent = params['ef1g_analyze_percent'];
+            params['ef1g_analyze_percent'] = ef1g_analyze_percent;
+        }
+    } else {
+         // 基本検索
+         // 不要なパラメータを削除
+         var key_prefixs = {0:'ef1g_column_min_', 1:'ef1g_power_min_'};
+         for (var i in key_prefixs) {
+             for (var key in params) {
+                 if (key.lastIndexOf(key_prefixs[i], 0) === 0 && params[key] == 20) {
+                     var max_key = key.replace('min', 'max');
+                     if (params[max_key] == 80) {
+                         delete(params[key]);
+                         delete(params[max_key]);
+                     }
+                 }
+             }
+         }
+    }
+
+    params['ef1g_job'] = [];
+    delete(params['ef1g_job[]']);
+    $("[name='ef1g_job[]']:checked").each(function(){
+        params['ef1g_job'].push(this.value);
+    });
+
+    return params;
+}
+/**
+ * 学生区分切り替え用
+ * @return
+ */
+function ui_student_categories_settings() {
+    $(function(){
+
+        $(".js-searchlist--more2__cbox:checked").each(function(){
+            $(this).addClass('js-selected-after-submit');
+        });
+
+        $('.js-searchlist--more2__cbox').click(function(){
+            switch_student_category(this);
+        });
+
+        content_closer();
+        function content_closer() {
+            $('.js-close-btn').click(function(){
+                $('.js-searchlist--more2__cbox').removeClass('active');
+                $('.js-searchcontent').removeClass('active');
+            });
+        }
+
+        // S/G/Aの選択をリセット
+        $('.js-reset__skubun').click(function(e){
+            e.preventDefault();
+            $('.js-searchlist--more2__cbox').prop('checked',false);
+            $('.js-searchlist--more2__cbox').removeClass('active');
+            $('.js-searchcontent').removeClass('active');
+            $('.js-option2-reset').attr('value', true);
+
+            set_search_count(make_search_params());
+        });
+
+        $('.form_reset').click(function(){
+            $('.js-searchlist--more2__cbox').removeClass('active');
+            $('.js-searchcontent').removeClass('active');
+        });
+
+    });
+}
+
+function switch_student_category(option2) {
+    $('.js-option2-reset').attr('value', '');
+
+    var cbox_val = $(option2).val();
+    var search_content = $('.js-searchcontent--'+cbox_val);
+
+    if ($(option2).hasClass('js-selected-after-submit')) {
+        $(option2).attr('checked', true);
+    } else {
+        $('.js-searchlist--more2__cbox').not(option2).removeAttr('checked');
+    }
+    $('.js-selected-after-submit').removeClass('js-selected-after-submit');
+
+    search_content.find('input, select').prop('disabled', false);
+    $.each($('.js-searchcontent').not('.js-searchcontent--'+cbox_val), function() {
+        $(this).find('input, select').prop('disabled', true);
+    });
+
+    if($(option2).hasClass('active')) {
+        if (search_content.hasClass('active')) {
+            $(option2).removeClass('active');
+            search_content.removeClass('active');
+        } else {
+            $(option2).addClass('active');
+            search_content.addClass('active');
+        }
+    } else {
+        $('.js-searchlist--more2__cbox').not(option2).removeClass('active');
+        $(option2).addClass('active');
+        $('.js-searchcontent').removeClass('active');
+        search_content.addClass('active');
+    }
+
+}
+
+function init_more2_duplicate_form() {
+    $.each($('.js-searchlist--more2__cbox'), function() {
+        if (!$(this).prop('checked')) {
+            var attr  = $(this).val();
+            var more2 = $('.searchcontent--'+attr);
+
+            $.each(more2.find('.lang-checkbox'), function() {
+                $(this).prop('checked', false);
+            });
+            $.each(more2.find('.pg-checkbox'), function() {
+                $(this).prop('checked', false);
+            });
+            more2.find('#form_SL').prop('selectedIndex', 0);
+            more2.find('#form_IT').prop('selectedIndex', 0);
+            more2.find('#form_IPA').prop('selectedIndex', 0);
+            more2.find('#form_PGCR').prop('selectedIndex', 0);
+            more2.find('#form_PGDV').prop('selectedIndex', 0);
+
+            more2.find('input, select').prop('disabled', true);
+        }
+    });
+}
+
+$(function() {
+    $('.alertPop-error').alertPop({
+        'class': 'error-belt'
+    });
+
+    // tooltip
+    $('[data-toggle="tooltip"]').tooltip();
+
+    // tooltipの吹き出しヘルプリンク付き
+    $("#show-popup-profile-input-rate").popover({
+        placement: 'right',
+        title: 'title',
+        content: 'hogehoge',
+        template: '<div class="popover help_tool help_tool--profile-input-rate" id="enlarged" onmouseover="$(this).mouseleave(function() {$(this).hide();});" style="display:block;"><div class="arrow"></div><div class="popover-inner"><div class="popover-content"><p></p></div></div></div>',
+        trigger: 'manual'
+    });
+    $('#show-popup-profile-input-rate').mouseover(function (evt) {
+        evt.stopPropagation();
+        $(this).popover('show');
+    });
+    $('.popover').mouseover(function (evt) {
+        evt.stopPropagation();
+        $(this).popover('show');
+    });
+    $('.popover').live('click', function (evt) {
+        evt.stopPropagation();
+    });
+    $('html').live('click', function () {
+        $('#show-popup-profile-input-rate').popover('hide');
+    });
+});

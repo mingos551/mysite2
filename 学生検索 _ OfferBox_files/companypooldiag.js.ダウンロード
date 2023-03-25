@@ -1,0 +1,77 @@
+// 学生プール用ダイアログボックス
+$(document).on('click', '.companypool', function() {
+    var method = $(this).hasClass("btn-success") ? 'delete' : 'insert';
+    var student_id = $(this).data('sid');
+
+    $.ajax({
+        url      : '/ccompanypool/pool.json',
+        type     : 'POST',
+        dataType : 'json',
+        cache    : false,
+        data     : {
+            student_id : student_id,
+            method     : method
+        }
+    }).done(function(res) {
+        var poolid = "#poolbutton-" + res.student_id;
+
+        if (res.method == 'delete') {
+            $(poolid).removeClass("btn-success");
+        } else if (res.method == 'insert') {
+            $(poolid).addClass("btn-success");
+        } else {
+            alert("不明なエラー");
+        }
+    }).fail(function(data) {
+        var res = JSON.parse(data.responseText);
+        var message = "学生番号:" + student_id + "\n";
+        for (var key in res.error) {
+            message += res.error[key] + "\n";
+        }
+        alert(message);
+    });
+});
+
+// 学生プール用一括登録
+var companypoolbundle_in_process = false;
+$(document).on('click', '.companypoolbundle', function() {
+    if (companypoolbundle_in_process) {
+        alert('処理中です');
+        return;
+    }
+    companypoolbundle_in_process = true;
+    var student_ids = [];
+
+    $(".companypool").each(function() {
+        if (!$(this).hasClass('btn-success')) {
+            student_ids.push($(this).data('sid'));
+        }
+    });
+
+    $.ajax({
+        url      : '/ccompanypool/poolbundle.json',
+        type     : 'POST',
+        dataType : 'json',
+        cache    : false,
+        data     : {
+            student_id : student_ids,
+            method     : 'insert'
+        }
+    }).done(function(res) {
+        var mode = res.method == 'insert' ? '登録' : '削除';
+        alert(res.count + "件プールに" + mode + "しました。");
+        for (var key in res.student_ids) {
+            $(".companypool[data-sid="+res.student_ids[key]+"]").addClass('btn-success');
+        }
+    }).fail(function(data) {
+        var res = JSON.parse(data.responseText);
+        var message = "";
+        for (var key in res.error) {
+            message += res.error[key] + "\n";
+        }
+        alert(message);
+    }).always(function(){
+        companypoolbundle_in_process = false;
+    });
+    
+});

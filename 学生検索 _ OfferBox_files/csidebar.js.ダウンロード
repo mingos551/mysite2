@@ -1,0 +1,10 @@
+$(function(){
+    $(document).on('click', '.csidemenu .openable', function(){
+        $(this).parent('li').next('li').slideToggle();
+        $(this).toggleClass('active');
+    });
+
+    $("#approved_report_notify").on('click', function () {
+        ga('allofferbox.send', 'event', 'cdecidemangae_banner', 'click_banner', 'cdecidemangae_remind_banner');
+    })
+});

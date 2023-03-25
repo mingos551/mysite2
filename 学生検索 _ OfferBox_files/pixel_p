@@ -1,0 +1,15 @@
+
+(function () {
+    if ('browsingTopics' in document && document.featurePolicy.allowsFeature('browsing-topics')) {
+        var bodies = document.getElementsByTagName("body")
+        if (bodies && bodies.length > 0) {
+            var b = bodies[0]
+            var e = document.createElement("iframe")
+            e.width = 1
+            e.height = 1
+            e.style.display = "none"
+            e.src = "https://cd.ladsp.com/html/getTopics.html?stu=nKmiy-PeHB8AkhpSqCv2MA&ot=AwBkCCjyekkI%2B8Dh%2BbGj2A9cwMYpM6%2BaC9w4plSRMXEIDPWbhSffbqRkynuBKBzVaQ9CVO0O05ctOkiMp94bUA0AAAB%2FeyJvcmlnaW4iOiJodHRwczovL2xhZHNwLmNvbTo0NDMiLCJmZWF0dXJlIjoiUHJpdmFjeVNhbmRib3hBZHNBUElzIiwiZXhwaXJ5IjoxNjgwNjUyNzk5LCJpc1N1YmRvbWFpbiI6dHJ1ZSwiaXNUaGlyZFBhcnR5Ijp0cnVlfQ%3D%3D"
+            b.appendChild(e)
+        }
+    }
+})()

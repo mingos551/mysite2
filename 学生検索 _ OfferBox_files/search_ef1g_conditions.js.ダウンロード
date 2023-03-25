@@ -1,0 +1,609 @@
+var slider_option_2axes = {
+    start: [-5, 5], // ハンドルの初期位置を最小値・最大値にする
+    step: 0.5, //ハンドルが一度で動く数を指定
+    margin: 1,
+    connect: true, //ハンドル間の色の付け方を変更する。初期値はfalse。
+    range: {
+        'min': -5, // スライダーの最小値を指定
+        'max': 5 // スライダーの最大値を指定
+    },
+    tooltips: true,
+    format: {
+        to: function(val) {
+            return parseInt(val);
+        },
+        from: function(val) {
+            return parseInt(val);
+        }
+    },
+    pips: {// pipsを指定するとスライダーに目盛りが付く
+        mode: 'values', // valuesで指定した固定数で目盛りを付ける。
+        values: [null, null, null, null, null, null, null, null, null, null, 0, null, null, null, null, null, null, null, null, null, null],
+        density: 4 //rangeで指定した範囲の何%ごとに小さな目盛りを振るか指定（デフォルトは1）。
+    }
+};
+
+// 画面読み込み時にリセット用のDOMを準備
+const ef1g_power_min_pointer    = $('#personal_search__power_group .ef1g_power_min');
+const ef1g_power_max_pointer    = $('#personal_search__power_group .ef1g_power_max');
+const ef1g_previous_min_pointer = $('#ef1g_previous_pointer .ef1g_column_min');
+const ef1g_previous_max_pointer = $('#ef1g_previous_pointer .ef1g_column_max');
+
+
+$(function () {
+    // slider表示
+    $.each($('.js-search-slider-2axes'), function () {
+        var slider = document.getElementById($(this).attr('id'));
+        var target = $(this).attr('for');
+        var prefix = $(this).data('prefix');
+        var min_input = document.getElementsByName(prefix + '_min_' + target)[0];
+        var max_input = document.getElementsByName(prefix + '_max_' + target)[0];
+
+        slider_option_2axes['start'] = [
+            convertBusinessPerformanceScoreToDisplay($(min_input).val()),
+            convertBusinessPerformanceScoreToDisplay($(max_input).val())
+        ];
+        noUiSlider.create(slider, slider_option_2axes);
+
+        // 連動 slider -> input
+        var slider_values = [min_input, max_input];
+        slider.noUiSlider.on('change', function (values, handle) {
+            if(handle){
+                $(slider_values[handle]).val(convertBusinessPerformanceMaxScoreFromDisplay(values[handle]));
+            }else{
+                $(slider_values[handle]).val(convertBusinessPerformanceMinScoreFromDisplay(values[handle]));
+            }
+        });
+
+        // 連動 input->slider
+        $(min_input).change(function () {
+            slider.noUiSlider.set([convertBusinessPerformanceScoreToDisplay($(this).val()), slider.noUiSlider.get()[1]]);
+        });
+        $(max_input).change(function () {
+            slider.noUiSlider.set([slider.noUiSlider.get()[0], convertBusinessPerformanceScoreToDisplay($(this).val())]);
+        });
+    });
+});
+
+// 適性検査eF-1G項目から探す用
+var slider_option = {
+    start: [20, 80],
+    step: 1,
+    margin: 1,
+    connect: true,
+    range: {
+        'min': 20,
+        'max': 80
+    },
+    tooltips: true,
+    format: {
+        to: function(val) {
+            return parseInt(val);
+        },
+        from: function(val) {
+            return parseInt(val);
+        }
+    },
+    pips: {
+        mode: 'values',
+        values: [20, 40, ,60, 80],
+        density: 4
+    }
+};
+
+$(function() {
+    // slider表示
+    $.each($('.js-search-slider'), function() {
+        var slider = document.getElementById($(this).attr('id'));
+        var target = $(this).attr('for');
+        var prefix = $(this).data('prefix');
+        var min_input = document.getElementsByName(prefix + '_min_' + target)[0];
+        var max_input = document.getElementsByName(prefix + '_max_' + target)[0];
+
+        slider_option['start'] = [$(min_input).val(), $(max_input).val()];
+        noUiSlider.create(slider, slider_option);
+
+        // 連動 sliber -> input
+        var slider_values = [min_input, max_input];
+        slider.noUiSlider.on('change', function(values, handle) {
+            $(slider_values[handle]).val(values[handle]);
+        });
+
+        // 連動 input->slider
+        $(min_input).change(function() {
+            slider.noUiSlider.set([$(this).val(), slider.noUiSlider.get()[1]]);
+        });
+        $(max_input).change(function() {
+            slider.noUiSlider.set([slider.noUiSlider.get()[0], $(this).val()]);
+        });
+    });
+
+    // モーダル内選択済みを表示
+    initialDisplayEf1gColumnAndBisiness();
+
+});
+
+function isAddableSearchConditions(mode) {
+    var selectedCompetenceSearchFlag = $('#form_competence_search_flag').val();
+
+    if (selectedCompetenceSearchFlag === '' && !isSettingEf1gColumn() && !isSettingEf1gBisiness()) {
+        return true;
+    }
+    if (selectedCompetenceSearchFlag == mode) {
+        return true;
+    }
+
+    var res = confirm("同時に検索できない条件が設定されています。現在の条件を適用しますか？\n（「OK」で同時に検索できない条件設定が解除されます。）");
+    if( res == true ) {
+        if ((mode !== '' && selectedCompetenceSearchFlag !== '') || mode === '') {
+            resetSearchOriginalActivepersonal();
+            resetSearchActivepersonal();
+            resetSearchActivestudent();
+            return true;
+        }
+        if (mode !== '') {
+            resetEf1gColumnAndBisiness();
+            return true;
+        }
+    } else {
+        return false;
+    }
+}
+
+// 適性検査eF-1G項目が設定されているか
+function isSettingEf1gColumn() {
+    var isSet = false;
+    $('[name^=ef1g_column_min_]').each(function() {
+        if ($(this).val() != 20) {
+            isSet = true;
+            return false;
+        }
+    });
+    if (!isSet) {
+        $('[name^=ef1g_column_max_]').each(function() {
+            if ($(this).val() != 80) {
+                isSet = true;
+                return false;
+            }
+        });
+    }
+    return isSet;
+}
+
+// 社会人基礎力が設定されているか
+function isSettingEf1gBisiness() {
+    var isSet = false;
+    $('[name^=ef1g_power_min_]').each(function() {
+        if ($(this).val() != 20) {
+            isSet = true;
+            return false;
+        }
+    });
+    if (!isSet) {
+        $('[name^=ef1g_power_max_]').each(function() {
+            if ($(this).val() != 80) {
+                isSet = true;
+                return false;
+            }
+        });
+    }
+    return isSet;
+}
+
+
+// slider 一括変更
+$('.all_input_change_btn').click(function() {
+    var min = $(this).siblings('.all_input_change_min').val();
+    var max = $(this).siblings('.all_input_change_max').val();
+
+    var error_msg = "";
+    if (!$.isNumeric(min) || min < 20 || min >= 80) {
+        error_msg = "最小:20 < 最大:80 の幅で入力してください。";
+    }
+    if (!$.isNumeric(max) || max > 80 || max <= 20) {
+        error_msg = "最小:20 < 最大:80 の幅で入力してください。";
+    }
+    if (min > max) {
+        error_msg = "最小:20 < 最大:80 の幅で入力してください。";
+    }
+    if (!error_msg) {
+        var prefix = $(this).data('target-prefix');
+        $('[name^='+prefix+'_min_]').val(min).change();
+        $('[name^='+prefix+'_max_]').val(max).change();
+    } else {
+        alert(error_msg);
+    }
+
+    return false;
+});
+
+// slider 一括変更 input enter submit don't work.
+$('[class^=all_input_change_]').on('keydown', function(e) {
+    if ((e.wich && e.wich === 13) || (e.keyCode && e.keyCode === 13)) {
+        $(this).siblings('.all_input_change_btn').click();
+        return false;
+    }
+    return true;
+});
+
+// モーダル閉じる時
+function modalCloseEvents() {
+    // 職種適性
+    displayPersonalSearchJobConditions();
+
+    if (isSettingEf1gColumn() || isSettingEf1gBisiness()) {
+        if (isAddableSearchConditions('')) {
+            displayEf1gColumnCondituins();
+            displayBisinessCondituins();
+        } else {
+            resetEf1gColumnAndBisiness();
+        }
+    } else {
+        resetEf1gColumnAndBisiness();
+    }
+
+    // 検索条件セット
+    if ($('#form_ef1g_search_flag').val() == 1) {
+        $('#form_ef1g_search_flag').val("");
+    }
+    $.each($('.view-ef1g'), function() {
+        if ($(this).text() != "") {
+            $('#form_ef1g_search_flag').val(1);
+        }
+    });
+}
+
+// modal 開いている時は pre_search_count 無効化
+$('#premium_serach_modals .modal').on('shown', function() {
+    if (!$(this).hasClass('is-creative')) {
+        set_pre_search_count_disable();
+    }
+});
+$('#premium_serach_modals .modal').on('hidden', function() {
+    if (!$(this).hasClass('is-creative')) {
+        modalCloseEvents();
+        set_pre_search_count_enable();
+        set_search_count(make_search_params());
+    }
+});
+
+/**
+ * 条件リセット
+ * cstudentsearch.jsからも呼び出される
+ */
+function resetPremiumSearch() {
+    if (!$(this).hasClass('is-creative')) {
+        set_pre_search_count_disable();
+    }
+
+    $('#form_competence_search_flag').val("");
+    resetSearchActivepersonal();
+    resetSearchActivestudent();
+    resetSearchOriginalActivepersonal();
+    resetSearchPersonalitymap();
+    // 社会人基礎力の入力と設定条件表示をリセット
+    if ($('#business_performance_search_checked').css('display') === 'block') {
+        ef1g_power_min_pointer.val(20).change();
+        ef1g_power_max_pointer.val(80).change();
+    }
+    $('#business_performance_search_checked').hide();
+    // 適性検査項目の入力と設定条件表示をリセット
+    if ($('#eF1-G_search_checked').css('display') === 'block') {
+        ef1g_previous_min_pointer.val(20).change();
+        ef1g_previous_max_pointer.val(80).change();
+    }
+    $('#eF1-G_search_checked').hide();
+
+    $('input[name=ef1g_search_and_flag]').val(["1"]);
+    $('.all_input_change_min').val(20);
+    $('.all_input_change_max').val(80);
+    $('#form_ef1g_search_flag').val("");
+    $('.view-ef1g').html("");
+    if (!$(this).hasClass('is-creative')) {
+        set_pre_search_count_enable();
+    }
+}
+
+// 職種適性の設定を表示
+function displayPersonalSearchJobConditions() {
+    var personalSearchJobText = '';
+    $('#personal_search__job').find('input[type=checkbox]:checked').each(function(i) {
+        if (i === 0) {
+            personalSearchJobText = '職種適性：';
+        }
+        personalSearchJobText += $(this).parent().text() + ' ';
+    });
+
+    $('#view-ef1g_job').text(personalSearchJobText);
+    var ef1gColumnText = $('#view-ef1g_column').text();
+    if (personalSearchJobText !== '' || ef1gColumnText !== '') {
+        $('#eF1-G_search_checked').show();
+    } else {
+        $('#eF1-G_search_checked').hide();
+    }
+}
+
+// 適性検査eF-1G項目の設定を表示
+function displayEf1gColumnCondituins() {
+    var ef1gColumnText = '';
+    $('.ef1g_slider_box').each(function() {
+        var title = $(this).find('h5').text();
+        var min = $(this).find('[name^=ef1g_column_min_]').val();
+        var max = $(this).find('[name^=ef1g_column_max_]').val();
+        if (min > 20 || max < 80) {
+            if (ef1gColumnText === '') {
+                ef1gColumnText = '適性検査eF-1G項目：';
+            }
+            ef1gColumnText += title + ' ';
+        }
+    });
+
+    $('#view-ef1g_column').text(ef1gColumnText);
+    var personalSearchJobText = $('#view-ef1g_job').text();
+    if (ef1gColumnText !== '' || personalSearchJobText !== '') {
+        $('#eF1-G_search_checked').show();
+    } else {
+        $('#eF1-G_search_checked').hide();
+    }
+}
+
+// 社会人基礎力の設定を表示
+function displayBisinessCondituins() {
+    // 社会人基礎力
+    var bisinessText = '';
+    $('.search-power-item').each(function() {
+        var title = $(this).find('.search-power-item__tit').text();
+        var min = $(this).find('[name^=ef1g_power_min_]').val();
+        var max = $(this).find('[name^=ef1g_power_max_]').val();
+        if (min > 20 || max < 80) {
+            bisinessText += title + ' ';
+        }
+    });
+
+    $('#view-ef1g_bisiness').text(bisinessText);
+    if ( bisinessText !== '' ) {
+        $('#business_performance_search_checked').show();
+    } else {
+        $('#business_performance_search_checked').hide();
+    }
+}
+
+// 適性検査eF-1G項目と社会人基礎力の初期表示
+function initialDisplayEf1gColumnAndBisiness() {
+    // 職種適性
+    displayPersonalSearchJobConditions();
+
+    var competenceSearchFlag = $('#form_competence_search_flag').val();
+    if (competenceSearchFlag !== '') {
+        resetEf1gColumnAndBisiness();
+    } else {
+        displayEf1gColumnCondituins();
+        displayBisinessCondituins();
+
+        // 検索条件セット
+        if ($('#form_ef1g_search_flag').val() == 1) {
+            $('#form_ef1g_search_flag').val("");
+        }
+        $.each($('.view-ef1g'), function() {
+            if ($(this).text() != "") {
+                $('#form_ef1g_search_flag').val(1);
+            }
+        });
+    }
+}
+
+// 適性検査eF-1G項目と社会人基礎力のリセット
+function resetEf1gColumnAndBisiness() {
+    set_pre_search_count_disable();
+    $('input[name=ef1g_search_and_flag]').val(["1"]);
+    $('.all_input_change_min').val(20);
+    $('.all_input_change_max').val(80);
+    // 社会人基礎力の入力と設定条件表示をリセット
+    if ($('#business_performance_search_checked').css('display') === 'block') {
+        ef1g_power_min_pointer.val(20).change();
+        ef1g_power_max_pointer.val(80).change();
+    }
+    $('#business_performance_search_checked').hide();
+    // 適性検査項目の入力と設定条件表示をリセット
+    if ($('#eF1-G_search_checked').css('display') === 'block') {
+        ef1g_previous_min_pointer.val(20).change();
+        ef1g_previous_max_pointer.val(80).change();
+    }
+    $('#form_ef1g_search_flag').val("");
+    // 設定表示初期化
+    $('#view-ef1g_column').text('');
+    $('#view-ef1g_bisiness').text('');
+    if ($('#view-ef1g_job').text() == '') {
+        $('#eF1-G_search_checked').hide();
+    }
+    $('#business_performance_search_checked').hide();
+    set_pre_search_count_enable();
+}
+
+// オリジナル活躍人材検索のリセット
+function resetSearchOriginalActivepersonal () {
+    $('input[name="ef1g_analyze_percent"][value="0"]').prop('checked', true);
+    $('#original_activepersonal_search_checked').hide();
+    $('#form_ef1g_search_flag').val('');
+    $('#form_competence_search_flag').val('');
+}
+
+/**
+ * 高評価学生分析の検索条件リセット
+ */
+function resetSearchActivestudent() {
+    $('input[name="activestudent_score"][value="0"]').prop('checked', true);
+    $('#cactivestudent_search_checked').hide();
+    $('#form_competence_search_flag').val('');
+    $('input[name="post_activestudent_score"]').val(0);
+}
+
+/**
+ * 活躍人材分析の検索条件リセット
+ */
+function resetSearchActivepersonal() {
+    $('input[name="activepersonal_score"][value="0"]').prop('checked', true);
+    $('#cactivepersonal_search_checked').hide();
+    $('#form_competence_search_flag').val('');
+    $('input[name="post_activepersonal_score"]').val(0);
+}
+
+/**
+ * 社会人基礎力値を表示用の値に変換する
+ * @param score
+ */
+function convertBusinessPerformanceScoreToDisplay(score) {
+    score = Number(score);
+    if (50.5 < score) {
+        // スコア：プラス値
+        if (66.1 < score) {
+            return 5; // 66.2以上、80以下
+        } else if (62.5 < score) {
+            return 4.5; // 62.6以上、66.1以下
+        } else if (60.1 < score) {
+            return 4; // 60.2以上、62.5以下
+        } else if (58.2 < score) {
+            return 3.5; // 58.3以上、60.1以下
+        } else if (56.6 < score) {
+            return 3; // 56.7以上、58.2以下
+        } else if (55.2 < score) {
+            return 2.5; // 55.3以上、56.6以下
+        } else if (53.9 < score) {
+            return 2; // 54以上、55.2以下
+        } else if (52.7 < score) {
+            return 1.5; // 52.8以上、53.9以下
+        } else if (51.6 < score) {
+            return 1; // 51.7以上、52.7以下
+        }
+        return 0.5; // 50.6以上、51.6以下
+    } else if (score < 49.5) {
+        // スコア：マイナス値
+        if (48.3 < score) {
+            return -0.5; // 48.4以上、49.4以下
+        } else if (47.2 < score) {
+            return -1; // 47.3以上、48.3以下
+        } else if (46 < score) {
+            return -1.5; // 46.1以上、47.2以下
+        } else if (44.7 < score) {
+            return -2; // 44.8以上、46以下
+        } else if (43.3 < score) {
+            return -2.5; // 43.4以上、44.7以下
+        } else if (41.7 < score) {
+            return -3; // 41.8以上、43.3以下
+        } else if (39.8 < score) {
+            return -3.5; // 39.9以上、41.7以下
+        } else if (37.4 < score) {
+            return -4; // 37.5以上、39.8以下
+        } else if (33.8 < score) {
+            return -4.5; // 33.9以上、37.4以下
+        }
+        return -5; // 20以上、33.8以下
+    }
+    return 0; // 49.5以上、50.5以下
+}
+
+/**
+ * 社会人基礎力を表示用の最小値から検索用の値に変換する
+ * @param score
+ */
+function convertBusinessPerformanceMinScoreFromDisplay(score) {
+    score = Number(score);
+    switch (score) {
+    case 5:
+        return 66.2; // 66.2以上、80以下
+    case 4.5:
+        return 62.6; // 62.6以上、66.1以下
+    case 4:
+        return 60.2; // 60.2以上、62.5以下
+    case 3.5:
+        return 58.3; // 58.3以上、60.1以下
+    case 3:
+        return 56.7; // 56.7以上、58.2以下
+    case 2.5:
+        return 55.3; // 55.3以上、56.6以下
+    case 2:
+        return 54; // 54以上、55.2以下
+    case 1.5:
+        return 52.8; // 52.8以上、53.9以下
+    case 1:
+        return 51.7; // 51.7以上、52.7以下
+    case 0.5:
+        return 50.6; // 50.6以上、51.6以下
+    case 0:
+        return 49.5; // 49.5以上、50.5以下
+    case -0.5:
+        return 48.4; // 48.4以上、49.4以下
+    case -1:
+        return 47.3; // 47.3以上、48.3以下
+    case -1.5:
+        return 46.1; // 46.1以上、47.2以下
+    case -2:
+        return 44.8; // 44.8以上、46以下
+    case -2.5:
+        return 43.4; // 43.4以上、44.7以下
+    case -3:
+        return 41.8; // 41.8以上、43.3以下
+    case -3.5:
+        return 39.9; // 39.9以上、41.7以下
+    case -4:
+        return 37.5; // 37.5以上、39.8以下
+    case -4.5:
+        return 33.9; // 33.9以上、37.4以下
+    case -5:
+        return 20; // 20以上、33.8以下
+    }
+    return 20;
+}
+
+/**
+ * 社会人基礎力を表示用の最大値から検索用の値に変換する
+ * @param score
+ */
+function convertBusinessPerformanceMaxScoreFromDisplay(score) {
+    score = Number(score);
+    switch (score) {
+    case 5:
+        return 80; // 66.2以上、80以下
+    case 4.5:
+        return 66.1; // 62.6以上、66.1以下
+    case 4:
+        return 62.5; // 60.2以上、62.5以下
+    case 3.5:
+        return 60.1; // 58.3以上、60.1以下
+    case 3:
+        return 58.2; // 56.7以上、58.2以下
+    case 2.5:
+        return 56.6; // 55.3以上、56.6以下
+    case 2:
+        return 55.2; // 54以上、55.2以下
+    case 1.5:
+        return 53.9; // 52.8以上、53.9以下
+    case 1:
+        return 52.7; // 51.7以上、52.7以下
+    case 0.5:
+        return 51.6; // 50.6以上、51.6以下
+    case 0:
+        return 50.5; // 49.5以上、50.5以下
+    case -0.5:
+        return 49.2; // 48.4以上、49.4以下
+    case -1:
+        return 48.3; // 47.3以上、48.3以下
+    case -1.5:
+        return 47.2; // 46.1以上、47.2以下
+    case -2:
+        return 46; // 44.8以上、46以下
+    case -2.5:
+        return 44.7; // 43.4以上、44.7以下
+    case -3:
+        return 43.3; // 41.8以上、43.3以下
+    case -3.5:
+        return 41.7; // 39.9以上、41.7以下
+    case -4:
+        return 39.8; // 37.5以上、39.8以下
+    case -4.5:
+        return 37.4; // 33.9以上、37.4以下
+    case -5:
+        return 33.8; // 20以上、33.8以下
+    }
+    return 80;
+}

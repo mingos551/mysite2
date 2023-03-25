@@ -1,0 +1,290 @@
+var OneSignal = window.OneSignal || [];
+// ブラウザ通知設定の確認
+function checkBrowserSettings() {
+  // 通知設定の非表示フラグの取得
+  var isHiddenNoticeSetting = getCookie('isHiddenNoticeSetting');
+  var path = location.pathname;
+
+  OneSignal.push(['getNotificationPermission', function(permission) {
+    setUserTags();
+
+    // ブラウザ通知設定されてないとき & 非表示フラグ
+    if (permission !== 'granted' && permission !== 'denied' && isHiddenNoticeSetting !== 'true' && document.getElementById('set-notifications')) {
+      document.getElementById('set-notifications').style.display = 'block';
+    }
+    // ブラウザ許可の場合、user登録・タグ登録
+    if (permission === 'granted') {
+      OneSignal.registerForPushNotifications();
+    }
+  }]);
+
+  OneSignal.push(function() {
+    // 通知設定変更時のコールバック
+    OneSignal.on('notificationPermissionChange', function(permissionChange) {
+
+      var currentPermission = permissionChange.to;
+      if (currentPermission === 'granted') {
+        grantedNotifications();
+      }
+      if (currentPermission === 'denied') {
+        deleteOnesignalIds();
+        deniedNotifications();
+      }
+      if (currentPermission === 'default') {
+        deleteOnesignalIds();
+        // 通知設定画面のとき
+        if (path === '/v2/cprof/setting') {
+          displayAlert();
+        }
+      }
+    });
+
+    OneSignal.on('subscriptionChange', function (isSubscribed) {
+      if (isSubscribed) {
+        grantedNotifications();
+        setUserTags();
+      }
+    });
+  })
+}
+// IE非推奨の表示制御設定
+function checkDeprecatedBrowserSettings() {
+  var userAgent = window.navigator.userAgent.toLowerCase();
+    if(userAgent.indexOf('msie') != -1 ||
+    userAgent.indexOf('trident') != -1 ) {
+      document.getElementById('set-deprecatedAlert').style.display = 'block';
+    }
+}
+// Cookie 保存
+function setCookie(key, value, expires) {
+  tmp = key + '=' + value + ';';
+  if (expires) {
+    tmp += 'expires=' + expires;
+  }
+  document.cookie = tmp;
+}
+
+// Cookie 取得
+function getCookie(key) {
+  var result = null;
+
+  var cookieName = key + '=';
+  var allcookies = document.cookie;
+
+  var position = allcookies.indexOf(cookieName);
+  if( position != -1 ) {
+    var startIndex = position + cookieName.length;
+
+    var endIndex = allcookies.indexOf(';', startIndex);
+    if( endIndex == -1 )
+    {
+      endIndex = allcookies.length;
+    }
+
+    result = decodeURIComponent(allcookies.substring(startIndex, endIndex));
+  }
+
+  return result;
+}
+
+function setUserTags() {
+  // 企業ID 取得
+  $companyId = getCookie('minamikataCompanyAuthId');
+
+  // ログイン済みの場合、OneSignal の Tags を設定する
+  // TODO: マルチログイン menber_id の登録
+  if ($companyId) {
+    OneSignal.push(function() {
+      OneSignal.sendTags({
+        companyId: $companyId,
+        memberId: ''
+      }).then(function(tagsSent) {
+      });
+    });
+  }
+}
+
+init();
+
+if (document.getElementById('set-notifications')) {
+  // 通知設定をクリック
+  document.getElementById('set-notifications').getElementsByTagName('a')[0].onclick = function() {
+    // ブラウザ通知を設定する
+    OneSignal.registerForPushNotifications();
+  }
+
+  // 通知設定クローズボタンをクリック
+  document.getElementById('set-notifications').getElementsByClassName('close')[0].onclick = function(e) {
+    e.stopPropagation();
+
+    var result = confirm('デスクトップ通知を許可する場合は、通知設定から変更可能です。');
+    if(result) {
+      // 通知設定の非表示フラグを Cookie に保存する
+      var date = new Date();
+      date.setFullYear(date.getFullYear() + 1);
+      setCookie('isHiddenNoticeSetting', true, date);
+      document.getElementById('set-notifications').style.display = 'none';
+    }
+  }
+}
+// TODO:不要か動作確認する
+if (document.getElementById('set-deprecatedAlert')) {
+  // 非推奨ブラウザの切り替え依頼リンクをクリック
+  document.getElementById('set-deprecatedAlert').getElementsByTagName('a')[0].onclick = function() {
+  }
+}
+
+function setDesktopNotification() {
+  var url = '/api/company/notification/desktop';
+  $.ajax({
+      url: url,
+      type: 'POST',
+      dataType: 'json',
+      cache: false
+  })
+  .done(function (res) {
+  })
+  .fail(function(jqXHR, textStatus, errorThrown){
+  })
+}
+
+function init() {
+  OneSignal.push(function() {
+    // ブラウザがプッシュ通知をサポートしているか確認
+    var isPushSupported = OneSignal.isPushNotificationsSupported();
+    var path = location.pathname;
+
+    if (isPushSupported && supportedOneSignalBrowser()) {
+      updateSession();
+      checkBrowserSettings();
+
+      // 通知設定画面のとき
+      if (path === '/v2/cprof/setting') {
+        displayAlert();
+      }
+    } else {
+      checkDeprecatedBrowserSettings();
+
+      if (path === '/v2/cprof/setting') {
+        // // 通知設定画面のとき、デスクトップ通知設定を非表示
+        var items = document.getElementsByClassName("desktop-notification-item");
+        for (var i=0; i<items.length; i++) {
+          items[i].classList.add('hide');
+        }
+      }
+    }
+  })
+}
+
+function supportedOneSignalBrowser() {
+  var userAgent = window.navigator.userAgent.toLowerCase();
+  // OneSignal WebPush の対応ブラウザは Chrome、Safari、FireFox のみ
+  if(userAgent.indexOf('msie') != -1 ||
+    userAgent.indexOf('trident') != -1 ) {
+    return false;
+  } else if(userAgent.indexOf('edge') != -1) {
+    return false;
+  } else if(userAgent.indexOf('chrome') != -1) {
+    return true;
+  } else if(userAgent.indexOf('safari') != -1) {
+    return true;
+  } else if(userAgent.indexOf('firefox') != -1) {
+    return true;
+  } else if(userAgent.indexOf('opera') != -1) {
+    return false;
+  } else {
+    return false;
+  }
+}
+
+// デスクトップ通知拒否
+function deniedNotifications() {
+  if (document.getElementById('set-notifications')) {
+    document.getElementById('set-notifications').style.display = 'none';
+  }
+
+  // 通知設定画面のとき
+  var path = location.pathname;
+  if (path === '/v2/cprof/setting') {
+    displayAlert();
+  }
+}
+
+// デスクトップ通知許可
+function grantedNotifications() {
+  if (document.getElementById('set-notifications')) {
+    document.getElementById('set-notifications').style.display = 'none';
+  }
+
+  // 通知設定を保存・タグを設定
+  setDesktopNotification();
+
+  // 通知設定画面のとき
+  var path = location.pathname;
+  if (path === '/v2/cprof/setting') {
+    displayAlert();
+  }
+}
+
+function displayAlert() {
+  OneSignal.push(['getNotificationPermission', function(permission) {
+    // 許可
+    if (permission === 'granted') {
+      document.getElementById('alert-notification-unset').classList.add('hide');
+      document.getElementById('alert-notification-block').classList.add('hide');
+    }
+    // 未設定アラート表示
+    if (permission === 'default') {
+      document.getElementById('alert-notification-unset').classList.remove('hide');
+      document.getElementById('alert-notification-block').classList.add('hide');
+
+      document.getElementById('alert-notification-unset').getElementsByTagName('a')[0].onclick = function() {
+        // ブラウザ通知を設定する
+        OneSignal.registerForPushNotifications();
+      }
+    }
+    // ブロックアラート表示
+    if (permission === 'denied') {
+      document.getElementById('alert-notification-unset').classList.add('hide');
+      document.getElementById('alert-notification-block').classList.remove('hide');
+    }
+  }])
+}
+
+function deleteOnesignalIds() {
+  var db = '';
+  var dbName = 'ONE_SIGNAL_SDK_DB';
+
+  var DBOpenRequest = window.indexedDB.open(dbName, 1);
+  DBOpenRequest.onsuccess = function (event) {
+    db = DBOpenRequest.result;
+
+    var request = db.transaction(["Ids"], "readwrite")
+    .objectStore("Ids")
+    .clear();
+    request.onsuccess = function(event) {
+    };
+  }
+  DBOpenRequest.onblocked = function (event) {
+      db = "blocked...";
+  };
+  DBOpenRequest.onerror = function (event) {
+      db = "Error...";
+  };
+}
+
+function updateSession() {
+  OneSignal.getUserId(function(userId) {
+    var url = 'https://onesignal.com/api/v1/players/'+userId+'/on_session';
+    $.ajax({
+        url: url,
+        type: 'POST',
+        dataType: 'json',
+        cache: false
+    })
+    .done(function (res) {
+    })
+    .fail(function(jqXHR, textStatus, errorThrown){
+    })
+  });
+}

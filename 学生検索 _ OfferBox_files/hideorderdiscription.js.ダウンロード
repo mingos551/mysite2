@@ -1,0 +1,21 @@
+// おすすめ順既読処理
+$(function(){
+    $("#order_discription > .close_button").click(function() {
+        // 非表示処理
+        $(this).parent().hide();
+
+        if($(this).attr('id') !== 'discription_read') {
+            return false;
+        }
+
+        // 既読処理
+        $.ajax({
+            type: 'post',
+            url: '/cstudent/order_description_read.json',
+            dataType: 'json'
+        }).fail(function(data){
+            alert('既読処理に失敗しました。');
+        });
+        return false;
+    });
+});
