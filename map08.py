@@ -1,11 +1,10 @@
 import streamlit as st
-from streamlit_folium import st_folium
-import folium
 import pandas as pd
 from streamlit_folium import folium_static
 from PIL import Image
 import math
 import base64
+import folium
 
 image = Image.open('DWELL_MATCHO.jpg')
 st.set_page_config(
