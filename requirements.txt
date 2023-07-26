@@ -1,9 +1,5 @@
 streamlit==1.23.1
-pandas
-streamlit_folium
-folium_static
-PIL 
-Image
-math
-base64
 folium
+pandas
+streamlit-folium
+Pillow
